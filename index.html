@@ -123,6 +123,22 @@
 
         main { padding: 26px 36px 30px; }
 
+        .search-section.carrera-section {
+            background: #fff9ee;
+            border: 1.5px dashed rgba(217,164,65,0.55);
+        }
+        .search-section.carrera-section label { color: var(--tierra); }
+        .search-section.carrera-section select {
+            flex: 1;
+            min-width: 160px;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238C5A34' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            border-color: rgba(217,164,65,0.5);
+        }
+        .search-section.carrera-section select:focus {
+            border-color: var(--tierra);
+            box-shadow: 0 0 0 3px rgba(140,90,52,0.16);
+        }
+
         .search-section {
             background: var(--verde-suave);
             padding: 18px 22px;
@@ -152,6 +168,23 @@
             color: var(--carbon);
             font-size: 0.94rem;
         }
+        /* Flecha del select forzada por CSS: algunos navegadores móviles
+           (sobre todo Android/Samsung Internet) no dibujan bien la flecha
+           nativa cuando el select tiene estilos personalizados. Se
+           desactiva el estilo nativo y se dibuja una flecha propia,
+           igual en todos los dispositivos. */
+        .search-section select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 42px;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A4A35' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 16px 16px;
+            cursor: pointer;
+        }
+        .search-section select::-ms-expand { display: none; }
         .search-section select:focus,
         .search-section input:focus {
             border-color: var(--oro-escudo);
@@ -493,6 +526,16 @@
     </header>
 
     <main>
+        <div class="search-section carrera-section">
+            <label>🎓 Busca por facultad y/o carrera:</label>
+            <select id="facultadSelect">
+                <option value="">-- Facultad --</option>
+            </select>
+            <select id="carreraSelect">
+                <option value="">-- Carrera --</option>
+            </select>
+        </div>
+
         <div class="search-section">
             <label for="targetid">📌 Edificio destino:</label>
             <select id="targetid">
@@ -719,7 +762,93 @@
     });
 
     // -------------------------------------------------------------
-    // 5. GEOLOCALIZACIÓN Y LÓGICA DE RUTA
+    // 4.1 BUSCADOR COMBINADO: FACULTAD + CARRERA
+    // -------------------------------------------------------------
+    // Facultades ancladas a un edificio/módulo representativo (decanato).
+    const facultades = [
+        { id: 'salud',        nombre: "Fac. Ciencias de la Salud Humana",              idEdificio: 57 }, // Módulo 272
+        { id: 'odontologia',  nombre: "Fac. Ciencias de Odontología",                  idEdificio: 61 }, // Módulo 281
+        { id: 'bioquimica',   nombre: "Fac. Bioquímica y Farmacia",                    idEdificio: 67 }, // Módulo 291
+        { id: 'informatica',  nombre: "Fac. Ciencias de la Computación e Informática", idEdificio: 5  }, // Módulo 236
+        { id: 'tecnologia',   nombre: "Fac. Ciencias Exactas y Tecnología",            idEdificio: 21 }, // Módulo 225
+        { id: 'politecnica',  nombre: "Fac. Politécnica",                             idEdificio: 15 }, // Módulo 215
+        { id: 'ingenieria',   nombre: "Escuela de Ingeniería (Civil / Industrial)",    idEdificio: 66 }, // Módulo 290
+        { id: 'juridicas',    nombre: "Fac. Cs. Jurídicas, Políticas y Sociales",      idEdificio: 63 }, // Módulo 283
+        { id: 'economicas',   nombre: "Fac. Ciencias Económicas",                      idEdificio: 46 }, // Módulo 255
+        { id: 'contaduria',   nombre: "Fac. Contaduría Pública",                       idEdificio: 14 }, // Módulo 214
+        { id: 'humanidades',  nombre: "Fac. Humanidades y Cs. de la Educación",        idEdificio: 45 }, // Módulo 254
+        { id: 'veterinaria',  nombre: "Fac. Medicina Veterinaria y Zootecnia",         idEdificio: 23 }  // Módulo 228
+    ];
+
+    // Cada carrera pertenece a una facultad y apunta a su edificio específico
+    // (puede ser el mismo de la facultad, o uno propio dentro del mismo complejo).
+    const carreras = [
+        { nombre: "Medicina", facultadId: 'salud', idEdificio: 57 },
+        { nombre: "Enfermería", facultadId: 'salud', idEdificio: 57 },
+        { nombre: "Odontología", facultadId: 'odontologia', idEdificio: 61 },
+        { nombre: "Bioquímica y Farmacia", facultadId: 'bioquimica', idEdificio: 67 },
+        { nombre: "Ingeniería de Sistemas", facultadId: 'informatica', idEdificio: 5 },
+        { nombre: "Ingeniería Informática", facultadId: 'informatica', idEdificio: 5 },
+        { nombre: "Ingeniería Civil", facultadId: 'ingenieria', idEdificio: 66 },
+        { nombre: "Ingeniería Industrial", facultadId: 'ingenieria', idEdificio: 66 },
+        { nombre: "Arquitectura", facultadId: 'tecnologia', idEdificio: 21 },
+        { nombre: "Derecho", facultadId: 'juridicas', idEdificio: 63 },
+        { nombre: "Ciencias Políticas / Relaciones Internacionales", facultadId: 'juridicas', idEdificio: 64 },
+        { nombre: "Contaduría Pública", facultadId: 'contaduria', idEdificio: 14 },
+        { nombre: "Administración de Empresas", facultadId: 'economicas', idEdificio: 46 },
+        { nombre: "Economía", facultadId: 'economicas', idEdificio: 47 },
+        { nombre: "Humanidades / Comunicación", facultadId: 'humanidades', idEdificio: 45 },
+        { nombre: "Idiomas", facultadId: 'humanidades', idEdificio: 52 },
+        { nombre: "Medicina Veterinaria y Zootecnia", facultadId: 'veterinaria', idEdificio: 23 },
+        { nombre: "Física / Química / Matemáticas", facultadId: 'tecnologia', idEdificio: 21 }
+    ];
+
+    const facultadSelect = document.getElementById('facultadSelect');
+    const carreraSelect = document.getElementById('carreraSelect');
+
+    // Poblar select de facultades (orden alfabético)
+    [...facultades].sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = f.nombre;
+        facultadSelect.appendChild(opt);
+    });
+
+    // Renderiza el select de carreras, opcionalmente filtrado por facultad
+    function renderCarreras(filtroFacultadId) {
+        carreraSelect.innerHTML = '<option value="">-- Carrera --</option>';
+        carreras.forEach((c, idx) => {
+            if (filtroFacultadId && c.facultadId !== filtroFacultadId) return;
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = c.nombre;
+            carreraSelect.appendChild(opt);
+        });
+    }
+    renderCarreras(null); // al inicio, muestra todas las carreras
+
+    // Al elegir FACULTAD: filtra las carreras de esa facultad y salta a su edificio
+    facultadSelect.addEventListener('change', function() {
+        const fid = this.value;
+        renderCarreras(fid || null);
+        if (!fid) return;
+        const fac = facultades.find(f => f.id === fid);
+        if (!fac) return;
+        select.value = fac.idEdificio;
+        select.dispatchEvent(new Event('change'));
+    });
+
+    // Al elegir CARRERA: sincroniza la facultad correspondiente y salta a su edificio
+    carreraSelect.addEventListener('change', function() {
+        const idx = this.value;
+        if (idx === '') return;
+        const c = carreras[parseInt(idx, 10)];
+        if (!c) return;
+        facultadSelect.value = c.facultadId; // combina: la facultad se ajusta sola
+        select.value = c.idEdificio;
+        select.dispatchEvent(new Event('change'));
+    });
+
     // -------------------------------------------------------------
     const statusMsg = document.getElementById('statusMessage');
     const googleBtn = document.getElementById('googleMapsLink');
