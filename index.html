@@ -739,8 +739,8 @@
         }
         document.getElementById('googleMapsLink').classList.add('hidden');
         document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Escribe tu origen o usa GPS.';
-        if (window.userLocation) {
-            planificarRuta(window.userLocation, edificios.find(e => e.id === id));
+        if (userLocation) {
+            planificarRuta(userLocation, edificios.find(e => e.id === id));
         }
     });
 
