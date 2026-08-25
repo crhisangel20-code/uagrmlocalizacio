@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>Mapa Inteligente UAGRM · Identidad Cruceña</title>
 
     <!-- Leaflet CSS -->
@@ -95,10 +95,14 @@
         }
         .emblema {
             flex-shrink: 0;
-            width: 66px;
-            height: 66px;
+            width: 64px;
+            height: 64px;
             position: relative;
             z-index: 1;
+            object-fit: contain;
+            background: radial-gradient(circle, rgba(251,248,241,0.14) 0%, transparent 70%);
+            border-radius: 50%;
+            padding: 4px;
         }
         .titulo-bloque { position: relative; z-index: 1; }
         h1 {
@@ -266,11 +270,13 @@
         }
 
         @media (max-width: 700px) {
+            body { padding: 12px; }
             main { padding: 18px 18px 22px; }
             header.hero { padding: 24px 22px; }
             h1 { font-size: 1.5rem; }
             .search-section { flex-direction: column; align-items: stretch; }
             .info-panel { flex-direction: column; align-items: stretch; text-align: center; }
+            #mapid { height: 68vh; min-height: 360px; }
         }
 
         .leaflet-routing-container {
@@ -326,31 +332,160 @@
             background: var(--verde-oscuro);
             font-size: 16px;
         }
+
+        /* =========================================================
+           PANTALLA DE BIENVENIDA / PORTADA
+           ========================================================= */
+        .portada {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(217,164,65,0.18), transparent 45%),
+                radial-gradient(circle at 80% 85%, rgba(217,164,65,0.14), transparent 50%),
+                linear-gradient(150deg, var(--verde-oscuro) 0%, var(--verde-bandera) 55%, #0d7f5a 100%);
+            animation: portadaEntrada 0.6s ease;
+        }
+        @keyframes portadaEntrada {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .portada-franja { display: flex; height: 10px; width: 100%; flex-shrink: 0; }
+        .portada-franja span { flex: 1; }
+        .portada-franja span:nth-child(1) { background: var(--oro-escudo); }
+        .portada-franja span:nth-child(2) { background: var(--marfil); }
+        .portada-franja span:nth-child(3) { background: var(--oro-escudo); }
+        .portada-franja-abajo { margin-top: auto; }
+
+        .portada-halo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: min(520px, 90vw);
+            height: min(520px, 90vw);
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: repeating-conic-gradient(from 0deg, rgba(217,164,65,0.10) 0deg 6deg, transparent 6deg 18deg);
+            pointer-events: none;
+        }
+
+        .portada-contenido {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px 20px;
+            gap: 14px;
+        }
+
+        .portada-escudo {
+            width: clamp(110px, 26vw, 190px);
+            height: auto;
+            filter: drop-shadow(0 12px 28px rgba(0,0,0,0.45));
+            margin-bottom: 6px;
+        }
+
+        .portada-eyebrow {
+            font-family: var(--font-body);
+            font-weight: 600;
+            font-size: clamp(0.78rem, 2.4vw, 0.95rem);
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            color: var(--oro-claro);
+        }
+
+        .portada-titulo {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: clamp(1.7rem, 6vw, 3rem);
+            line-height: 1.12;
+            color: var(--marfil);
+            max-width: 18ch;
+        }
+        .portada-titulo .accent { color: var(--oro-claro); font-style: italic; font-weight: 500; }
+
+        .portada-sub {
+            font-size: clamp(0.88rem, 2.6vw, 1.05rem);
+            color: rgba(251,248,241,0.86);
+            max-width: 46ch;
+            line-height: 1.5;
+        }
+
+        .btn-ingresar {
+            margin-top: 12px;
+            border: none;
+            background: var(--oro-escudo);
+            color: var(--verde-oscuro);
+            font-family: var(--font-body);
+            font-weight: 700;
+            font-size: clamp(0.92rem, 2.6vw, 1.02rem);
+            padding: 14px 32px;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+            transition: 0.2s;
+        }
+        .btn-ingresar:hover { background: var(--oro-claro); transform: translateY(-2px); }
+        .btn-ingresar:active { transform: translateY(0); }
+
+        .portada.oculto { display: none; }
+
+        /* =========================================================
+           RESPONSIVE GENERAL - AJUSTE A CUALQUIER DISPOSITIVO MÓVIL
+           ========================================================= */
+        @media (max-width: 480px) {
+            body { padding: 0; align-items: stretch; }
+            .container { border-radius: 0; border: none; }
+            header.hero { padding: 20px 16px; gap: 14px; }
+            .emblema { width: 46px; height: 46px; }
+            h1 { font-size: 1.25rem; }
+            .subtitulo { font-size: 0.8rem; }
+            main { padding: 14px 12px 18px; }
+            .search-section { padding: 14px 14px; gap: 10px; }
+            .search-section select, .search-section input { min-width: 100%; font-size: 0.9rem; }
+            .btn-geo, .btn-calcular { width: 100%; text-align: center; }
+            .leyenda { padding: 10px 12px; gap: 6px 12px; }
+            .leyenda-item { font-size: 0.72rem; }
+            #mapid { height: 62vh; min-height: 320px; border-radius: 14px; }
+            .info-panel { padding: 12px 14px; }
+            .info-panel .message { font-size: 0.86rem; }
+            .footer-note { font-size: 0.74rem; }
+        }
+
+        @media (max-width: 380px) {
+            .portada-escudo { width: 100px; }
+            .btn-ingresar { padding: 12px 24px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
+<!-- ================= PANTALLA DE BIENVENIDA / PORTADA ================= -->
+<div class="portada" id="portada">
+    <div class="portada-franja"><span></span><span></span><span></span></div>
+    <div class="portada-halo"></div>
+    <div class="portada-contenido">
+        <img src="https://raw.githubusercontent.com/crhisangel20-code/uagrmlocalizacio/main/esscudo.png" alt="Escudo de Santa Cruz de la Sierra" class="portada-escudo" />
+        <div class="portada-eyebrow">Universidad Autónoma Gabriel René Moreno</div>
+        <h1 class="portada-titulo">Mapa Inteligente <span class="accent">UAGRM</span></h1>
+        <p class="portada-sub">Sistema de geolocalización y rutas dentro del campus universitario, con identidad cruceña</p>
+        <button class="btn-ingresar" id="btnIngresar">Ingresar al mapa ➜</button>
+    </div>
+    <div class="portada-franja portada-franja-abajo"><span></span><span></span><span></span></div>
+</div>
+
+<div class="container" id="appContainer">
     <div class="franja-bandera"><span></span><span></span><span></span></div>
 
     <header class="hero">
-        <svg class="emblema" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="50" cy="50" r="46" fill="none" stroke="#F1C773" stroke-width="2.5"/>
-            <circle cx="50" cy="50" r="30" fill="#D9A441"/>
-            <g fill="#0A4A35">
-                <circle cx="50" cy="50" r="12"/>
-                <g id="rayos">
-                    <path d="M50 12 L54 26 L46 26 Z"/>
-                    <path d="M50 88 L54 74 L46 74 Z"/>
-                    <path d="M12 50 L26 46 L26 54 Z"/>
-                    <path d="M88 50 L74 46 L74 54 Z"/>
-                    <path d="M22 22 L33 30 L28 35 Z"/>
-                    <path d="M78 78 L67 70 L72 65 Z"/>
-                    <path d="M78 22 L67 30 L72 35 Z"/>
-                    <path d="M22 78 L33 70 L28 65 Z"/>
-                </g>
-            </g>
-        </svg>
+        <img class="emblema" src="https://raw.githubusercontent.com/crhisangel20-code/uagrmlocalizacio/main/esscudo.png" alt="Escudo de Santa Cruz de la Sierra" />
+
         <div class="titulo-bloque">
             <h1>Mapa Inteligente <span class="accent">UAGRM</span></h1>
             <div class="subtitulo">Universidad Autónoma Gabriel René Moreno · Orientación y rutas en campus</div>
@@ -382,7 +517,6 @@
         <div class="footer-note">
             🧭 Si estás lejos (&gt; 1 km) te sugerimos Google Maps. Al acercarte (&lt; 1 km) activamos navegación peatonal dentro del mapa.
             Al estar a 100 m del destino, recibirás una alerta visual.
-            <div class="firma">Facultad de Ciencias de la Computación y Telecomunicaciones · UAGRM</div>
         </div>
     </main>
 </div>
@@ -772,7 +906,20 @@
     });
 
     // -------------------------------------------------------------
-    // 7. AJUSTE INICIAL
+    // 7. PANTALLA DE BIENVENIDA
+    // -------------------------------------------------------------
+    document.getElementById('btnIngresar').addEventListener('click', function() {
+        const portada = document.getElementById('portada');
+        portada.style.opacity = '0';
+        portada.style.transition = 'opacity 0.35s ease';
+        setTimeout(() => {
+            portada.classList.add('oculto');
+            map.invalidateSize();
+        }, 350);
+    });
+
+    // -------------------------------------------------------------
+    // 8. AJUSTE INICIAL
     // -------------------------------------------------------------
     setTimeout(() => map.invalidateSize(), 400);
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
