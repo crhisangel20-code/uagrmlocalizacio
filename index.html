@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Inteligente UAGRM · Identidad Cruceña</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <!-- Leaflet Control Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
+    <!-- Tipografías: Fraunces (identidad / herencia colonial) + Inter (utilitaria) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* ---- Paleta cruceña: bandera verde-blanco-verde + escudo (sol, oro, cielo, tierra) ---- */
+            --verde-bandera: #0B6E4F;   /* verde principal de la bandera de Santa Cruz */
+            --verde-oscuro:  #0A4A35;   /* verde profundo, sombras y textos fuertes */
+            --verde-suave:   #E7F3EC;   /* fondo tenue derivado del verde */
+            --oro-escudo:    #D9A441;   /* sol / detalles dorados del escudo */
+            --oro-claro:     #F1C773;
+            --tierra:        #8C5A34;   /* tierra colorada de la llanura cruceña */
+            --cielo:         #3E7CB1;   /* azul del escudo (cielo/río) */
+            --marfil:        #FBF8F1;   /* blanco cálido, no puro, tipo lienzo */
+            --carbon:        #1C2620;   /* texto principal, casi negro verdoso */
+            --rojo-salud:    #B23A48;
+
+            --font-display: 'Fraunces', serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-body);
+            background:
+                radial-gradient(circle at 15% 10%, rgba(217,164,65,0.10), transparent 40%),
+                radial-gradient(circle at 85% 90%, rgba(11,110,79,0.10), transparent 45%),
+                var(--marfil);
+            padding: 22px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--carbon);
+        }
+
+        .container {
+            max-width: 1240px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 22px;
+            box-shadow: 0 24px 70px rgba(10, 30, 20, 0.16);
+            overflow: hidden;
+            border: 1px solid rgba(11,110,79,0.10);
+        }
+
+        /* ---------- Franja bandera: verde / blanco / verde ---------- */
+        .franja-bandera {
+            display: flex;
+            height: 10px;
+            width: 100%;
+        }
+        .franja-bandera span { flex: 1; }
+        .franja-bandera span:nth-child(1) { background: var(--verde-bandera); }
+        .franja-bandera span:nth-child(2) { background: var(--marfil); }
+        .franja-bandera span:nth-child(3) { background: var(--verde-bandera); }
+
+        /* ---------- Encabezado con emblema tipo escudo (sol radiante) ---------- */
+        header.hero {
+            position: relative;
+            background: linear-gradient(135deg, var(--verde-oscuro) 0%, var(--verde-bandera) 62%, #0d7f5a 100%);
+            padding: 34px 40px 30px;
+            color: var(--marfil);
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            overflow: hidden;
+        }
+        header.hero::before {
+            /* textura sutil tipo rayos de sol, evocando el escudo */
+            content: "";
+            position: absolute;
+            right: -80px;
+            top: -80px;
+            width: 320px;
+            height: 320px;
+            background: repeating-conic-gradient(from 0deg, rgba(217,164,65,0.16) 0deg 6deg, transparent 6deg 18deg);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .emblema {
+            flex-shrink: 0;
+            width: 66px;
+            height: 66px;
+            position: relative;
+            z-index: 1;
+        }
+        .titulo-bloque { position: relative; z-index: 1; }
+        h1 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 2.15rem;
+            letter-spacing: 0.2px;
+            line-height: 1.1;
+        }
+        h1 .accent { color: var(--oro-claro); font-style: italic; font-weight: 500; }
+        .subtitulo {
+            margin-top: 6px;
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: rgba(251,248,241,0.82);
+            letter-spacing: 0.3px;
+        }
+
+        main { padding: 26px 36px 30px; }
+
+        .search-section {
+            background: var(--verde-suave);
+            padding: 18px 22px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            border: 1px solid rgba(11,110,79,0.12);
+        }
+        .search-section label {
+            font-weight: 600;
+            color: var(--verde-oscuro);
+            font-size: 0.92rem;
+            white-space: nowrap;
+        }
+        .search-section select,
+        .search-section input {
+            flex: 1;
+            min-width: 190px;
+            padding: 11px 16px;
+            border: 1.5px solid rgba(11,110,79,0.28);
+            border-radius: 12px;
+            font-family: var(--font-body);
+            background: #ffffff;
+            color: var(--carbon);
+            font-size: 0.94rem;
+        }
+        .search-section select:focus,
+        .search-section input:focus {
+            border-color: var(--oro-escudo);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(217,164,65,0.18);
+        }
+        .btn-geo,
+        .btn-calcular {
+            border: none;
+            padding: 11px 22px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.92rem;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+            font-family: var(--font-body);
+        }
+        .btn-calcular {
+            background: var(--oro-escudo);
+            color: var(--verde-oscuro);
+        }
+        .btn-calcular:hover { background: var(--oro-claro); }
+        .btn-geo {
+            background: var(--verde-oscuro);
+            color: var(--marfil);
+        }
+        .btn-geo:hover { background: var(--verde-bandera); }
+        .btn-geo:disabled { opacity: 0.7; cursor: progress; }
+
+        /* ---------- Leyenda de categorías ---------- */
+        .leyenda {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            margin-bottom: 16px;
+            padding: 12px 18px;
+            background: #ffffff;
+            border: 1px dashed rgba(140,90,52,0.35);
+            border-radius: 14px;
+        }
+        .leyenda-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.8rem;
+            color: var(--carbon);
+            font-weight: 500;
+        }
+        .leyenda-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        #mapid {
+            width: 100%;
+            height: 520px;
+            border-radius: 18px;
+            border: 2px solid rgba(11,110,79,0.18);
+            z-index: 1;
+        }
+
+        .info-panel {
+            margin-top: 16px;
+            padding: 15px 20px;
+            background: var(--verde-suave);
+            border-radius: 14px;
+            border-left: 6px solid var(--oro-escudo);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .info-panel .message {
+            font-weight: 500;
+            color: var(--verde-oscuro);
+            flex: 1;
+            font-size: 0.94rem;
+        }
+        .info-panel .btn-google {
+            background: var(--cielo);
+            color: #fff;
+            border: none;
+            padding: 9px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.88rem;
+        }
+        .info-panel .btn-google:hover { background: #2f6693; }
+        .info-panel .btn-google.hidden { display: none; }
+
+        .footer-note {
+            margin-top: 16px;
+            font-size: 0.82rem;
+            color: #6a7f74;
+            text-align: center;
+            line-height: 1.5;
+        }
+        .firma {
+            margin-top: 4px;
+            font-family: var(--font-display);
+            font-style: italic;
+            font-size: 0.85rem;
+            color: var(--tierra);
+        }
+
+        @media (max-width: 700px) {
+            main { padding: 18px 18px 22px; }
+            header.hero { padding: 24px 22px; }
+            h1 { font-size: 1.5rem; }
+            .search-section { flex-direction: column; align-items: stretch; }
+            .info-panel { flex-direction: column; align-items: stretch; text-align: center; }
+        }
+
+        .leaflet-routing-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-family: var(--font-body);
+        }
+        .leaflet-routing-alt { max-height: 150px; overflow-y: auto; }
+
+        /* Popups con acento cruceño */
+        .leaflet-popup-content-wrapper {
+            border-radius: 10px;
+            border-top: 3px solid var(--oro-escudo);
+        }
+        .leaflet-popup-content b { color: var(--verde-oscuro); }
+        .categoria-tag {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            color: #fff;
+        }
+
+        /* Icono divIcon personalizado */
+        .pin-icono {
+            width: 26px;
+            height: 26px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pin-icono span {
+            transform: rotate(45deg);
+            font-size: 12px;
+        }
+        .pin-sede {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            box-shadow: 0 0 0 3px var(--oro-escudo), 0 3px 10px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--verde-oscuro);
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="franja-bandera"><span></span><span></span><span></span></div>
+
+    <header class="hero">
+        <svg class="emblema" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#F1C773" stroke-width="2.5"/>
+            <circle cx="50" cy="50" r="30" fill="#D9A441"/>
+            <g fill="#0A4A35">
+                <circle cx="50" cy="50" r="12"/>
+                <g id="rayos">
+                    <path d="M50 12 L54 26 L46 26 Z"/>
+                    <path d="M50 88 L54 74 L46 74 Z"/>
+                    <path d="M12 50 L26 46 L26 54 Z"/>
+                    <path d="M88 50 L74 46 L74 54 Z"/>
+                    <path d="M22 22 L33 30 L28 35 Z"/>
+                    <path d="M78 78 L67 70 L72 65 Z"/>
+                    <path d="M78 22 L67 30 L72 35 Z"/>
+                    <path d="M22 78 L33 70 L28 65 Z"/>
+                </g>
+            </g>
+        </svg>
+        <div class="titulo-bloque">
+            <h1>Mapa Inteligente <span class="accent">UAGRM</span></h1>
+            <div class="subtitulo">Universidad Autónoma Gabriel René Moreno · Orientación y rutas en campus</div>
+        </div>
+    </header>
+
+    <main>
+        <div class="search-section">
+            <label for="targetid">📌 Edificio destino:</label>
+            <select id="targetid">
+                <option value="">-- Selecciona un edificio --</option>
+            </select>
+            <input type="text" id="originInput" placeholder="Origen (ej. Warnes, La Guardia, Av. San Martín)" />
+            <button class="btn-calcular" id="btnCalcularRuta">➡️ Calcular ruta</button>
+            <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
+        </div>
+
+        <div class="leyenda" id="leyenda"></div>
+
+        <div id="mapid"></div>
+
+        <div class="info-panel" id="infoPanel">
+            <span class="message" id="statusMessage">🌍 Selecciona un edificio y luego escribe tu origen o usa GPS.</span>
+            <a href="#" id="googleMapsLink" class="btn-google hidden" target="_blank">
+                🚗 Abrir en Google Maps
+            </a>
+        </div>
+
+        <div class="footer-note">
+            🧭 Si estás lejos (&gt; 1 km) te sugerimos Google Maps. Al acercarte (&lt; 1 km) activamos navegación peatonal dentro del mapa.
+            Al estar a 100 m del destino, recibirás una alerta visual.
+            <div class="firma">Facultad de Ciencias de la Computación y Telecomunicaciones · UAGRM</div>
+        </div>
+    </main>
+</div>
+
+<!-- Scripts Leaflet y plugins -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
+
+<script>
+    // -------------------------------------------------------------
+    // 1. DATOS DE EDIFICIOS
+    // -------------------------------------------------------------
+    const edificios = [
+        { id: 1, nombre: "Ciudad Universitaria", lat: -17.775488, lng: -63.19373 },
+        { id: 9, nombre: "↪ Cancha Polifuncional", lat: -17.7741408, lng: -63.1937158 },
+        { id: 10, nombre: "↪ Módulo 201", lat: -17.7747168, lng: -63.1936147 },
+        { id: 11, nombre: "↪ Módulo 210", lat: -17.7740079, lng: -63.1940806 },
+        { id: 12, nombre: "↪ Módulo 211", lat: -17.7742353, lng: -63.1940372 },
+        { id: 2, nombre: "↪ Módulo 202", lat: -17.7754673, lng: -63.1937322 },
+        { id: 3, nombre: "↪ Módulo 212", lat: -17.7754571, lng: -63.1941828 },
+        { id: 4, nombre: "↪ Módulo 213", lat: -17.7762998, lng: -63.1940836 },
+        { id: 14, nombre: "↪ Módulo 214 - Facultad Contaduría Pública", lat: -17.7766032, lng: -63.1940655 },
+        { id: 15, nombre: "↪ Módulo 215 - Fac. Politécnica - Lab Especialidades", lat: -17.7747857, lng: -63.1940250 },
+        { id: 16, nombre: "↪ Módulo 220 - Oficinas C.I.D.T.A", lat: -17.7737665, lng: -63.1942831 },
+        { id: 17, nombre: "↪ Módulo 221 - Laboratorio Ing. Civil", lat: -17.7736702, lng: -63.1948868 },
+        { id: 18, nombre: "↪ Módulo 222 - Aulas", lat: -17.7742182, lng: -63.1947392 },
+        { id: 19, nombre: "↪ Módulo 223 - Snack", lat: -17.7748164, lng: -63.1944736 },
+        { id: 20, nombre: "↪ Módulo 224 - Tecnología", lat: -17.7754529, lng: -63.1944685 },
+        { id: 21, nombre: "↪ Módulo 225 - Facultad de Ciencias Exactas y Tecnología", lat: -17.7756049, lng: -63.1949454 },
+        { id: 22, nombre: "↪ Módulo 226 - Cancha Polifuncional", lat: -17.7762949, lng: -63.1947181 },
+        { id: 23, nombre: "↪ Módulo 228 - Edif. Central Facultad de Veterinaria", lat: -17.7768097, lng: -63.1948632 },
+        { id: 24, nombre: "↪ Módulo 229 - Biblioteca Veterinaria", lat: -17.7770957, lng: -63.1944429 },
+        { id: 25, nombre: "↪ Módulo 230 - Laboratorio Hidraulica Tecnología", lat: -17.7735220, lng: -63.1953886 },
+        { id: 26, nombre: "↪ Módulo 232 - Módulo Aulas", lat: -17.7740562, lng: -63.1953250 },
+        { id: 27, nombre: "↪ Módulo 233 - Módulo Aulas", lat: -17.7746469, lng: -63.1953884 },
+        { id: 28, nombre: "↪ Módulo 234 - Biblioteca de Tecnología", lat: -17.7751618, lng: -63.1951150 },
+        { id: 5, nombre: "↪ Módulo 236 - Fac. Informática", lat: -17.7763402, lng: -63.1950599 },
+        { id: 29, nombre: "↪ Módulo 237 - Horno crematorio - Centro Interno", lat: -17.7777439, lng: -63.1953728 },
+        { id: 30, nombre: "↪ Módulo 238 - Laboratorio Hospital para animales", lat: -17.7777142, lng: -63.1950321 },
+        { id: 31, nombre: "↪ Módulo 240 - Editorial Universitaria-Archivo central", lat: -17.7734968, lng: -63.1956294 },
+        { id: 32, nombre: "↪ Módulo 241 - Proyección", lat: -17.7760808, lng: -63.1954344 },
+        { id: 33, nombre: "↪ Módulo 242 - Módulo Aulas", lat: -17.7741508, lng: -63.1959776 },
+        { id: 34, nombre: "↪ Módulo 243 - Módulo Aulas", lat: -17.7744776, lng: -63.1959496 },
+        { id: 35, nombre: "↪ Módulo 244 - Oficinas Tecnología-Económicas", lat: -17.7755371, lng: -63.1954212 },
+        { id: 36, nombre: "↪ Módulo 245 - Módulo Servicios #1", lat: -17.7762306, lng: -63.1957948 },
+        { id: 37, nombre: "↪ Módulo 246 - Hospital de Veterinaria", lat: -17.7767174, lng: -63.1957347 },
+        { id: 38, nombre: "↪ Modulo 247 - Hospital Escuela de Veterinaria", lat: -17.7772280, lng: -63.1960240 },
+        { id: 39, nombre: "↪ Modulo 248 - Laboratorio Morfosiológico", lat: -17.7774229, lng: -63.1956523 },
+        { id: 40, nombre: "↪ Modulo 249 - Cancha Polifuncional", lat: -17.7780142, lng: -63.1955953 },
+        { id: 41, nombre: "↪ Módulo 250 - Laboratorio Cs. de la Salud Humana", lat: -17.7733700, lng: -63.1963710 },
+        { id: 42, nombre: "↪ Módulo 251 - Fac. de Tecnología - Lab Especialidades", lat: -17.7736743, lng: -63.1961439 },
+        { id: 43, nombre: "↪ Módulo 252 - Módulo Aulas", lat: -17.7739400, lng: -63.1965570 },
+        { id: 44, nombre: "↪ Módulo 253 - Módulo Servicios #2", lat: -17.7744449, lng: -63.1964178 },
+        { id: 45, nombre: "↪ Módulo 254 - Fac. Humanidades", lat: -17.7747632, lng: -63.1964889 },
+        { id: 46, nombre: "↪ Módulo 255 - Fac. Cs. Económicas", lat: -17.7761620, lng: -63.1965980 },
+        { id: 47, nombre: "↪ Módulo 256 - Fac. Cs. Económicas", lat: -17.7764309, lng: -63.1962735 },
+        { id: 48, nombre: "↪ Módulo 257 - Biblioteca Cs. Económicas", lat: -17.7767902, lng: -63.1963348 },
+        { id: 49, nombre: "↪ Módulo 258 - Laboratorio Fac. Veterinarias", lat: -17.7780583, lng: -63.1965498 },
+        { id: 50, nombre: "↪ Módulo 260 - Lab. Física - Química", lat: -17.7735504, lng: -63.1967213 },
+        { id: 51, nombre: "↪ Módulo 261 - Lab. Física - Química", lat: -17.7737587, lng: -63.1969379 },
+        { id: 52, nombre: "↪ Módulo 262 - Fac. Humanidades", lat: -17.7744330, lng: -63.1968210 },
+        { id: 53, nombre: "↪ Módulo 263 - Fac. Humanidades", lat: -17.7750190, lng: -63.1968240 },
+        { id: 54, nombre: "↪ Módulo 264 - Fac. Cs. Económicas", lat: -17.7764367, lng: -63.1969474 },
+        { id: 55, nombre: "↪ Módulo 265 - Fac. Cs. Económicas", lat: -17.7767357, lng: -63.1966756 },
+        { id: 56, nombre: "↪ Módulo 270 - Coliseo Deportivo", lat: -17.7736789, lng: -63.1975340 },
+        { id: 57, nombre: "↪ Módulo 272 - Fac. Cs. de la Salud Humana", lat: -17.7749599, lng: -63.1976638 },
+        { id: 58, nombre: "↪ Módulo 273 - Estacionamiento Vertical y Cancha Polifuncional", lat: -17.7765467, lng: -63.1973747 },
+        { id: 59, nombre: "↪ Módulo 274 - Canal 11 Televisión Universitaria", lat: -17.7774150, lng: -63.1976100 },
+        { id: 60, nombre: "↪ Módulo 280 - Fac. Cs. de la Salud Humana", lat: -17.7746590, lng: -63.1979140 },
+        { id: 61, nombre: "↪ Módulo 281 - Fac. Cs. de Odontología", lat: -17.7749955, lng: -63.1983214 },
+        { id: 62, nombre: "↪ Módulo 282 - Fac. Cs. de la Salud Humana", lat: -17.7752510, lng: -63.1980110 },
+        { id: 63, nombre: "↪ Módulo 283 - Fac. Cs. Juridicas, Politicas y Sociales", lat: -17.7760387, lng: -63.1981904 },
+        { id: 64, nombre: "↪ Módulo 284 - Fac. Cs. Juridicas, Politicas y Sociales", lat: -17.7763607, lng: -63.1981666 },
+        { id: 65, nombre: "↪ Módulo 285 - Morgue Judicial - Anfiteatro, Quirofano", lat: -17.7746127, lng: -63.1982732 },
+        { id: 66, nombre: "↪ Módulo 290 - Escuela de Ingeniería", lat: -17.7732126, lng: -63.1984764 },
+        { id: 67, nombre: "↪ Módulo 291 - Fac. Bioquimica y Farmacia", lat: -17.7749439, lng: -63.1985908 },
+        { id: 68, nombre: "↪ Módulo 292 - Comedor Universitario", lat: -17.7756035, lng: -63.1986441 },
+        { id: 69, nombre: "↪ Módulo 293 - Gimnasio Universitario", lat: -17.7763091, lng: -63.1986066 },
+        { id: 70, nombre: "↪ Módulo 295 - Estadio Universitario", lat: -17.7739810, lng: -63.1983516 },
+        { id: 6, nombre: "Campus Universitario", lat: -17.7776450, lng: -63.1915350 },
+        { id: 7, nombre: "↪ Pabellón 145", lat: -17.7787770, lng: -63.1905000 },
+        { id: 8, nombre: "↪ DTIC", lat: -17.7771320, lng: -63.1905750 },
+        { id: 71, nombre: "↪ Rectorado", lat: -17.7754010, lng: -63.1920110 },
+        { id: 72, nombre: "↪ Vicerrectorado", lat: -17.7782231, lng: -63.1916143 },
+        { id: 73, nombre: "↪ Guarderia", lat: -17.7758710, lng: -63.1919670 },
+        { id: 74, nombre: "Guarderia Gabrielito", lat: -17.7756220, lng: -63.1914533 },
+        { id: 75, nombre: "Aula Magna", lat: -17.7782260, lng: -63.1916100 },
+        { id: 76, nombre: "Post-Grado - Fac. de Tecnología", lat: -17.7780588, lng: -63.1903273 }
+    ];
+
+    // -------------------------------------------------------------
+    // 2. CATEGORÍAS Y COLORES (identidad cruceña: escudo + bandera)
+    // -------------------------------------------------------------
+    const CATEGORIAS = {
+        sede:      { color: '#0A4A35', icon: '🏛️', label: 'Sede principal' },
+        facultad:  { color: '#D9A441', icon: '🎓', label: 'Facultad' },
+        biblioteca:{ color: '#3E7CB1', icon: '📚', label: 'Biblioteca' },
+        laboratorio:{ color: '#6B4C9A', icon: '🧪', label: 'Laboratorio' },
+        deportivo: { color: '#E8622C', icon: '⚽', label: 'Deportivo' },
+        salud:     { color: '#B23A48', icon: '⚕️', label: 'Salud / Hospital' },
+        administrativo: { color: '#1B3B5F', icon: '🏢', label: 'Administrativo' },
+        servicios: { color: '#8C5A34', icon: '🍽️', label: 'Servicios' },
+        aula:      { color: '#0B6E4F', icon: '📖', label: 'Aulas' }
+    };
+
+    function categorizar(nombre) {
+        const n = nombre.toLowerCase();
+        if (n.includes('ciudad universitaria') || n.includes('campus universitario')) return 'sede';
+        if (n.includes('biblioteca')) return 'biblioteca';
+        if (n.includes('laboratorio') || n.includes('lab ') || n.includes('lab.') || n.includes('lab especialidades')) return 'laboratorio';
+        if (n.includes('cancha') || n.includes('coliseo') || n.includes('gimnasio') || n.includes('estadio') || n.includes('polifuncional')) return 'deportivo';
+        if (n.includes('hospital') || n.includes('morgue') || n.includes('quirofano') || n.includes('salud humana') || n.includes('odontolog')) return 'salud';
+        if (n.includes('rectorado') || n.includes('vicerrectorado') || n.includes('guarderia') || n.includes('oficinas') || n.includes('cidta') || n.includes('archivo')) return 'administrativo';
+        if (n.includes('snack') || n.includes('comedor') || n.includes('estacionamiento') || n.includes('editorial') || n.includes('televisión') || n.includes('television') || n.includes('proyección') || n.includes('proyeccion') || n.includes('crematorio')) return 'servicios';
+        if (n.includes('fac.') || n.includes('facultad') || n.includes('escuela de') || n.includes('post-grado')) return 'facultad';
+        return 'aula';
+    }
+
+    function crearIcono(cat, esSede) {
+        const c = CATEGORIAS[cat];
+        if (esSede) {
+            return L.divIcon({
+                className: '',
+                html: `<div class="pin-sede">${c.icon}</div>`,
+                iconSize: [34, 34],
+                iconAnchor: [17, 17],
+                popupAnchor: [0, -14]
+            });
+        }
+        return L.divIcon({
+            className: '',
+            html: `<div class="pin-icono" style="background:${c.color};"><span>${c.icon}</span></div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 24],
+            popupAnchor: [0, -24]
+        });
+    }
+
+    // -------------------------------------------------------------
+    // 3. MAPA Y CAPAS
+    // -------------------------------------------------------------
+    const map = L.map('mapid').setView([-17.78, -63.18], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Marcadores
+    const markers = {};
+    edificios.forEach(ed => {
+        const cat = categorizar(ed.nombre);
+        const esSede = cat === 'sede';
+        const c = CATEGORIAS[cat];
+        const popupContent = `<strong>${ed.nombre}</strong><br><span class="categoria-tag" style="background:${c.color};">${c.icon} ${c.label}</span>`;
+        const marker = L.marker([ed.lat, ed.lng], { icon: crearIcono(cat, esSede) })
+            .addTo(map)
+            .bindPopup(popupContent);
+        markers[ed.id] = marker;
+    });
+
+    // Leyenda dinámica
+    const leyendaEl = document.getElementById('leyenda');
+    Object.values(CATEGORIAS).forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'leyenda-item';
+        item.innerHTML = `<span class="leyenda-dot" style="background:${c.color};"></span>${c.icon} ${c.label}`;
+        leyendaEl.appendChild(item);
+    });
+
+    // -------------------------------------------------------------
+    // 4. SELECTOR DE EDIFICIOS
+    // -------------------------------------------------------------
+    const select = document.getElementById('targetid');
+    const sorted = [...edificios].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    sorted.forEach(ed => {
+        const opt = document.createElement('option');
+        opt.value = ed.id;
+        opt.textContent = ed.nombre;
+        select.appendChild(opt);
+    });
+
+    let selectedBuildingId = null;
+    select.addEventListener('change', function() {
+        const id = parseInt(this.value, 10);
+        if (!id || !markers[id]) return;
+        selectedBuildingId = id;
+        const latlng = markers[id].getLatLng();
+        map.setView(latlng, 18, { animate: true });
+        markers[id].openPopup();
+        if (window.routingControl) {
+            map.removeControl(window.routingControl);
+            window.routingControl = null;
+        }
+        document.getElementById('googleMapsLink').classList.add('hidden');
+        document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Escribe tu origen o usa GPS.';
+        if (window.userLocation) {
+            planificarRuta(window.userLocation, edificios.find(e => e.id === id));
+        }
+    });
+
+    // -------------------------------------------------------------
+    // 5. GEOLOCALIZACIÓN Y LÓGICA DE RUTA
+    // -------------------------------------------------------------
+    const statusMsg = document.getElementById('statusMessage');
+    const googleBtn = document.getElementById('googleMapsLink');
+
+    let userLocation = null;
+    let destinoActual = null;
+    let watchId = null;
+
+    function distancia(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function iconoOrigenDestino(tipo) {
+        const color = tipo === 'origen' ? '#3E7CB1' : '#D9A441';
+        const emoji = tipo === 'origen' ? '📍' : '🏁';
+        return L.divIcon({
+            className: '',
+            html: `<div class="pin-icono" style="background:${color};"><span>${emoji}</span></div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 26],
+            popupAnchor: [0, -26]
+        });
+    }
+
+    function planificarRuta(originLatLng, destino) {
+        if (!destino) {
+            statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
+            return;
+        }
+        destinoActual = destino;
+        const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
+
+        if (window.routingControl) {
+            map.removeControl(window.routingControl);
+            window.routingControl = null;
+        }
+        if (window.originMarker) {
+            map.removeLayer(window.originMarker);
+            window.originMarker = null;
+        }
+        if (window.destMarker) {
+            map.removeLayer(window.destMarker);
+            window.destMarker = null;
+        }
+
+        if (dist > 1) {
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${originLatLng.lat},${originLatLng.lng}&destination=${destino.lat},${destino.lng}&travelmode=driving`;
+            googleBtn.href = url;
+            googleBtn.classList.remove('hidden');
+            statusMsg.innerHTML = `🚗 Estás a ${dist.toFixed(2)} km de tu destino. Te sugerimos usar Google Maps para llegar en auto/moto.`;
+            window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
+                .addTo(map).bindPopup('📍 Origen').openPopup();
+            window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
+                .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+            const bounds = L.latLngBounds([originLatLng.lat, originLatLng.lng], [destino.lat, destino.lng]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else {
+            googleBtn.classList.add('hidden');
+            statusMsg.innerHTML = `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal. Sigue la línea verde.`;
+
+            window.routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(originLatLng.lat, originLatLng.lng),
+                    L.latLng(destino.lat, destino.lng)
+                ],
+                routeWhileDragging: true,
+                show: true,
+                showAlternatives: false,
+                lineOptions: {
+                    styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
+                },
+                router: L.Routing.osrmv1({ profile: 'foot' }),
+                createMarker: function() { return null; }
+            }).addTo(map);
+
+            window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
+                .addTo(map).bindPopup('📍 Origen').openPopup();
+            window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
+                .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            window.alertaMostrada = false;
+            watchId = navigator.geolocation.watchPosition(
+                function(pos) {
+                    const userLat = pos.coords.latitude;
+                    const userLng = pos.coords.longitude;
+                    const d = distancia(userLat, userLng, destino.lat, destino.lng);
+                    if (d <= 0.1) {
+                        statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea verde para llegar a tu destino.';
+                        if (!window.alertaMostrada) {
+                            alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea verde en el mapa.');
+                            window.alertaMostrada = true;
+                        }
+                        navigator.geolocation.clearWatch(watchId);
+                        watchId = null;
+                    }
+                },
+                function(err) { console.warn('Error en watchPosition:', err); },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+            );
+        }
+    }
+
+    document.getElementById('btnMiUbicacion').addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            alert('Tu navegador no soporta GPS.');
+            return;
+        }
+        if (!selectedBuildingId) {
+            alert('Primero selecciona un edificio destino.');
+            return;
+        }
+        const destino = edificios.find(e => e.id === selectedBuildingId);
+        if (!destino) return;
+
+        this.textContent = '🔄 Buscando GPS...';
+        this.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                userLocation = { lat, lng };
+                document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
+                document.getElementById('btnMiUbicacion').disabled = false;
+                map.setView([lat, lng], 15, { animate: true });
+                planificarRuta(userLocation, destino);
+            },
+            function(err) {
+                let msg = 'No se pudo obtener ubicación. ';
+                if (err.code === 1) msg += 'Permite el acceso en el navegador.';
+                else msg += 'Intenta de nuevo.';
+                alert(msg);
+                document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
+                document.getElementById('btnMiUbicacion').disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    });
+
+    // -------------------------------------------------------------
+    // 6. BÚSQUEDA DE ORIGEN MANUAL (Geocoder)
+    // -------------------------------------------------------------
+    const geocoder = L.Control.Geocoder.nominatim();
+    const originInput = document.getElementById('originInput');
+
+    function calcularRutaDesdeOrigen() {
+        const query = originInput.value.trim();
+        if (!query) {
+            alert('Escribe un origen válido (ej. La Guardia, Warnes, Av. San Martín).');
+            return;
+        }
+        if (!selectedBuildingId) {
+            alert('Primero selecciona un edificio destino.');
+            return;
+        }
+        geocoder.geocode(query, function(results) {
+            if (results.length === 0) {
+                alert('No se encontró esa dirección. Intenta con otro nombre.');
+                return;
+            }
+            const first = results[0];
+            const lat = first.center.lat;
+            const lng = first.center.lng;
+            userLocation = { lat, lng };
+            const destino = edificios.find(e => e.id === selectedBuildingId);
+            if (destino) {
+                map.setView([lat, lng], 15, { animate: true });
+                planificarRuta(userLocation, destino);
+                if (window.originMarker) map.removeLayer(window.originMarker);
+                window.originMarker = L.marker([lat, lng], { icon: iconoOrigenDestino('origen') })
+                    .addTo(map).bindPopup('📍 Origen: ' + query).openPopup();
+            }
+        });
+    }
+
+    document.getElementById('btnCalcularRuta').addEventListener('click', calcularRutaDesdeOrigen);
+    originInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') calcularRutaDesdeOrigen();
+    });
+
+    // -------------------------------------------------------------
+    // 7. AJUSTE INICIAL
+    // -------------------------------------------------------------
+    setTimeout(() => map.invalidateSize(), 400);
+    console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
+</script>
+
+</body>
+</html>
