@@ -650,7 +650,14 @@
             })
                 .then(function(respuesta) {
                     if (!respuesta.ok) {
-                        throw new Error('El proxy de OpenRouteService respondió con estado ' + respuesta.status);
+                        // AÑADIDO PARA OPENROUTESERVICE: leemos y mostramos
+                        // el cuerpo real de la respuesta de error del proxy
+                        // (antes solo se mostraba el código de estado, sin
+                        // el detalle del problema).
+                        return respuesta.text().then(function(textoError) {
+                            console.error('DETALLE COMPLETO DEL ERROR DEL PROXY (estado ' + respuesta.status + '):', textoError);
+                            throw new Error('El proxy de OpenRouteService respondió con estado ' + respuesta.status + '. Detalle: ' + textoError);
+                        });
                     }
                     return respuesta.json();
                 })
