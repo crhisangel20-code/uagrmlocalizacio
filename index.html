@@ -1655,6 +1655,74 @@
 
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
 </script>
+<!-- ============================================================
+     DIAGNÓSTICO AUTOMÁTICO DE RED DE SENDEROS
+     Pega este bloque completo justo ANTES de la línea que dice
+     </body>  (al final del archivo index.html)
+     ============================================================ -->
+<script>
+setTimeout(function diagnosticarRedSenderos() {
+    if (!window.redSenderos || !redSenderos.nodos || !redSenderos.nodos.length) {
+        alert('⚠️ No se cargó la red de senderos todavía. Espera unos segundos más y recarga la página.');
+        return;
+    }
 
+    const nodos = redSenderos.nodos;
+    const aristas = redSenderos.aristas;
+
+    const grafo = {};
+    nodos.forEach(n => grafo[n.id] = []);
+    aristas.forEach(([a, b]) => {
+        if (grafo[a] && grafo[b]) {
+            grafo[a].push(b);
+            grafo[b].push(a);
+        }
+    });
+
+    const visitado = new Set();
+    const islas = [];
+
+    nodos.forEach(nodoInicial => {
+        if (visitado.has(nodoInicial.id)) return;
+        const isla = [];
+        const cola = [nodoInicial.id];
+        visitado.add(nodoInicial.id);
+        while (cola.length) {
+            const actual = cola.pop();
+            isla.push(actual);
+            (grafo[actual] || []).forEach(vecino => {
+                if (!visitado.has(vecino)) {
+                    visitado.add(vecino);
+                    cola.push(vecino);
+                }
+            });
+        }
+        islas.push(isla);
+    });
+
+    islas.sort((a, b) => b.length - a.length);
+
+    let mensaje = 'DIAGNÓSTICO DE RED DE SENDEROS\n';
+    mensaje += '================================\n';
+    mensaje += 'Total nodos: ' + nodos.length + '\n';
+    mensaje += 'Total conexiones: ' + aristas.length + '\n';
+    mensaje += 'Islas encontradas: ' + islas.length + '\n\n';
+
+    if (islas.length === 1) {
+        mensaje += '✅ Toda la red está conectada en un solo grupo.';
+    } else {
+        mensaje += '⚠️ Hay ' + islas.length + ' grupos separados que debes conectar:\n\n';
+        islas.forEach(function(isla, i) {
+            const nodosDeIsla = isla.map(function(id) { return nodos.find(function(n) { return n.id === id; }); });
+            const latProm = (nodosDeIsla.reduce(function(s, n) { return s + n.lat; }, 0) / nodosDeIsla.length).toFixed(6);
+            const lngProm = (nodosDeIsla.reduce(function(s, n) { return s + n.lng; }, 0) / nodosDeIsla.length).toFixed(6);
+            mensaje += 'Isla #' + (i + 1) + ': ' + isla.length + ' nodos - centro aprox (' + latProm + ', ' + lngProm + ')\n';
+        });
+    }
+
+    console.log(mensaje);
+    alert(mensaje);
+}, 3000);
+</script>
 </body>
 </html>
