@@ -317,6 +317,79 @@
         }
         .instrucciones-panel.hidden { display: none; }
 
+        /* AÑADIDO PARA RED DE SENDEROS: editor visual de senderos */
+        .editor-senderos {
+            margin-top: 16px;
+        }
+        .btn-editor-toggle {
+            width: 100%;
+            border: 1.5px dashed rgba(140,90,52,0.4);
+            background: #fffdf8;
+            color: var(--tierra);
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: var(--font-body);
+        }
+        .btn-editor-toggle:hover { background: #fbf3e6; }
+        .btn-editor-toggle.activo {
+            background: var(--tierra);
+            color: #fff;
+            border-style: solid;
+        }
+        .editor-senderos-panel {
+            margin-top: 10px;
+            padding: 16px;
+            background: #fffaf0;
+            border: 1.5px solid rgba(140,90,52,0.3);
+            border-radius: 14px;
+        }
+        .editor-senderos-panel.hidden { display: none; }
+        .editor-instrucciones {
+            font-size: 0.85rem;
+            color: var(--carbon);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        .editor-botones {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .editor-botones button,
+        .btn-importar {
+            border: 1px solid rgba(140,90,52,0.4);
+            background: #ffffff;
+            color: var(--tierra);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-family: var(--font-body);
+            display: inline-flex;
+            align-items: center;
+        }
+        .editor-botones button:hover,
+        .btn-importar:hover { background: #fdf2e2; }
+        .editor-contador {
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: #6a5a3a;
+        }
+        .nodo-sendero {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #3E7CB1;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+        }
+        .nodo-sendero.seleccionado {
+            background: var(--oro-escudo);
+        }
+
         .footer-note {
             margin-top: 16px;
             font-size: 0.82rem;
@@ -591,6 +664,29 @@
             🧭 Si estás lejos (&gt; 1 km) te sugerimos Google Maps. Al acercarte (&lt; 1 km) activamos navegación peatonal dentro del mapa.
             Al estar a 100 m del destino, recibirás una alerta visual.
         </div>
+
+        <!-- AÑADIDO PARA RED DE SENDEROS: editor visual de senderos peatonales -->
+        <div class="editor-senderos" id="editorSenderos">
+            <button class="btn-editor-toggle" id="btnToggleEditor">🛠️ Editor de senderos peatonales</button>
+            <div class="editor-senderos-panel hidden" id="editorSenderosPanel">
+                <p class="editor-instrucciones">
+                    <strong>Modo edición ACTIVO.</strong> Haz clic en el mapa para agregar puntos (nodos) sobre los
+                    senderos reales del campus. Luego haz clic en dos nodos seguidos para conectarlos con un tramo
+                    caminable. Repite hasta cubrir toda la red de senderos que quieres usar.
+                </p>
+                <div class="editor-botones">
+                    <button id="btnDeshacerNodo">↩️ Deshacer último nodo</button>
+                    <button id="btnDeshacerArista">↩️ Deshacer última conexión</button>
+                    <button id="btnLimpiarRed">🗑️ Limpiar todo</button>
+                    <button id="btnExportarRed">💾 Exportar senderos.json</button>
+                    <label class="btn-importar">
+                        📂 Importar senderos.json
+                        <input type="file" id="inputImportarRed" accept="application/json" hidden />
+                    </label>
+                </div>
+                <p class="editor-contador" id="editorContador">0 nodos · 0 conexiones</p>
+            </div>
+        </div>
     </main>
 </div>
 
@@ -710,6 +806,174 @@
                     console.error('Error al calcular ruta con ORS vía proxy:', error);
                     callback.call(context, { status: -1, message: error.message });
                 });
+        }
+    });
+
+    // ===============================================================
+    // AÑADIDO PARA RED DE SENDEROS: red de puntos y conexiones dibujada
+    // a mano sobre el mapa, para calcular rutas peatonales SIN depender
+    // de los datos de OpenStreetMap/ORS. Si existe un archivo
+    // 'senderos.json' junto al index.html, se carga automáticamente al
+    // iniciar y se usa como fuente de la ruta peatonal (en vez de ORS).
+    // ===============================================================
+    let redSenderos = { nodos: [], aristas: [] }; // AÑADIDO PARA RED DE SENDEROS
+    let siguienteIdNodo = 1; // AÑADIDO PARA RED DE SENDEROS
+
+    // AÑADIDO PARA RED DE SENDEROS: distancia en metros entre dos nodos
+    function distanciaMetrosEntreNodos(a, b) {
+        return distancia(a.lat, a.lng, b.lat, b.lng) * 1000;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: arma un grafo de adyacencia a partir
+    // de la lista de nodos y aristas, listo para Dijkstra.
+    function construirGrafo(red) {
+        const grafo = {};
+        red.nodos.forEach(function(n) { grafo[n.id] = []; });
+        red.aristas.forEach(function(par) {
+            const idA = par[0], idB = par[1];
+            const nodoA = red.nodos.find(function(n) { return n.id === idA; });
+            const nodoB = red.nodos.find(function(n) { return n.id === idB; });
+            if (!nodoA || !nodoB) return;
+            const dist = distanciaMetrosEntreNodos(nodoA, nodoB);
+            grafo[idA].push({ id: idB, dist: dist });
+            grafo[idB].push({ id: idA, dist: dist });
+        });
+        return grafo;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: encuentra el nodo de la red más
+    // cercano a una coordenada dada (para "entrar" y "salir" de la red).
+    function nodoMasCercano(red, lat, lng) {
+        let mejor = null;
+        let mejorDist = Infinity;
+        red.nodos.forEach(function(n) {
+            const d = distancia(lat, lng, n.lat, n.lng);
+            if (d < mejorDist) { mejorDist = d; mejor = n; }
+        });
+        return mejor;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: Dijkstra clásico sobre el grafo de
+    // la red de senderos. Devuelve la lista ordenada de ids de nodos del
+    // camino más corto, o null si no hay camino posible entre ambos.
+    function dijkstra(grafo, inicioId, finId) {
+        const distancias = {};
+        const previos = {};
+        const pendientes = new Set(Object.keys(grafo).map(Number));
+
+        pendientes.forEach(function(id) { distancias[id] = Infinity; });
+        distancias[inicioId] = 0;
+
+        while (pendientes.size > 0) {
+            let actual = null;
+            let menorDist = Infinity;
+            pendientes.forEach(function(id) {
+                if (distancias[id] < menorDist) { menorDist = distancias[id]; actual = id; }
+            });
+            if (actual === null) break;
+            pendientes.delete(actual);
+            if (actual === finId) break;
+
+            (grafo[actual] || []).forEach(function(vecino) {
+                if (!pendientes.has(vecino.id)) return;
+                const alt = distancias[actual] + vecino.dist;
+                if (alt < distancias[vecino.id]) {
+                    distancias[vecino.id] = alt;
+                    previos[vecino.id] = actual;
+                }
+            });
+        }
+
+        if (distancias[finId] === undefined || distancias[finId] === Infinity) return null;
+
+        const camino = [];
+        let paso = finId;
+        while (paso !== undefined) {
+            camino.unshift(paso);
+            paso = previos[paso];
+        }
+        return { camino: camino, distanciaTotal: distancias[finId] };
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: calcula el rumbo (bearing) en grados
+    // entre dos coordenadas, usado para generar indicaciones de giro.
+    function calcularRumbo(lat1, lng1, lat2, lng2) {
+        const rad = Math.PI / 180;
+        const y = Math.sin((lng2 - lng1) * rad) * Math.cos(lat2 * rad);
+        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+                  Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: router compatible con Leaflet Routing
+    // Machine que calcula la ruta usando la red dibujada a mano en vez
+    // de llamar a OpenRouteService.
+    L.Routing.RedSenderosRouter = L.Class.extend({
+        route: function(waypoints, callback, context) {
+            const origen = waypoints[0].latLng;
+            const destinoWp = waypoints[waypoints.length - 1].latLng;
+
+            if (!redSenderos.nodos.length) {
+                callback.call(context, { status: -1, message: 'La red de senderos está vacía.' });
+                return;
+            }
+
+            const nodoInicio = nodoMasCercano(redSenderos, origen.lat, origen.lng);
+            const nodoFin = nodoMasCercano(redSenderos, destinoWp.lat, destinoWp.lng);
+            const grafo = construirGrafo(redSenderos);
+            const resultado = dijkstra(grafo, nodoInicio.id, nodoFin.id);
+
+            if (!resultado) {
+                callback.call(context, { status: -1, message: 'No hay un camino conectado entre esos dos puntos en la red de senderos.' });
+                return;
+            }
+
+            // Construir la lista de coordenadas: origen real -> nodos de
+            // la red -> destino real
+            const coordenadasRuta = [L.latLng(origen.lat, origen.lng)];
+            resultado.camino.forEach(function(id) {
+                const nodo = redSenderos.nodos.find(function(n) { return n.id === id; });
+                coordenadasRuta.push(L.latLng(nodo.lat, nodo.lng));
+            });
+            coordenadasRuta.push(L.latLng(destinoWp.lat, destinoWp.lng));
+
+            // Generar indicaciones simples: distancia de cada tramo y
+            // aviso de giro cuando el cambio de rumbo es notorio.
+            const pasos = [];
+            for (let i = 0; i < coordenadasRuta.length - 1; i++) {
+                const a = coordenadasRuta[i];
+                const b = coordenadasRuta[i + 1];
+                const distTramo = distancia(a.lat, a.lng, b.lat, b.lng) * 1000;
+                let textoInstruccion = 'Continúa recto';
+                if (i > 0) {
+                    const rumboAnterior = calcularRumbo(coordenadasRuta[i - 1].lat, coordenadasRuta[i - 1].lng, a.lat, a.lng);
+                    const rumboActual = calcularRumbo(a.lat, a.lng, b.lat, b.lng);
+                    let diff = rumboActual - rumboAnterior;
+                    diff = ((diff + 180) % 360 + 360) % 360 - 180; // normalizar a [-180, 180]
+                    if (diff > 30) textoInstruccion = 'Gira a la derecha';
+                    else if (diff < -30) textoInstruccion = 'Gira a la izquierda';
+                }
+                if (distTramo >= 1) {
+                    pasos.push({ instruccion: textoInstruccion, distanciaMetros: Math.round(distTramo) });
+                }
+            }
+            pasos.push({ instruccion: 'Has llegado a tu destino', distanciaMetros: 0 });
+
+            const ruta = {
+                name: 'Ruta peatonal (red de senderos propia)',
+                coordinates: coordenadasRuta,
+                instructions: [],
+                pasos: pasos,
+                summary: {
+                    totalDistance: resultado.distanciaTotal,
+                    totalTime: Math.round(resultado.distanciaTotal / 1.2) // ~1.2 m/s caminando
+                },
+                inputWaypoints: waypoints,
+                waypoints: waypoints,
+                actualWaypoints: waypoints
+            };
+
+            callback.call(context, null, [ruta]);
         }
     });
 
@@ -1023,7 +1287,18 @@
             });
         } else {
             googleBtn.classList.add('hidden');
-            statusMsg.innerHTML = `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (OpenRouteService). Sigue la línea verde.`;
+
+            // AÑADIDO PARA RED DE SENDEROS: usa la red dibujada a mano si
+            // ya tiene nodos cargados; si no, cae de vuelta a ORS como
+            // respaldo automático (no rompe lo que ya funcionaba).
+            const usandoRedPropia = redSenderos.nodos.length > 0;
+            const routerElegido = usandoRedPropia
+                ? new L.Routing.RedSenderosRouter()
+                : new L.Routing.ORSRouter({ proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/' });
+
+            statusMsg.innerHTML = usandoRedPropia
+                ? `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (red de senderos propia). Sigue la línea verde.`
+                : `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (OpenRouteService). Sigue la línea verde.`;
 
             window.routingControl = L.Routing.control({
                 waypoints: [
@@ -1036,9 +1311,7 @@
                 lineOptions: {
                     styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
                 },
-                router: new L.Routing.ORSRouter({ // AÑADIDO PARA OPENROUTESERVICE: reemplaza L.Routing.osrmv1
-                    proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/'
-                }),
+                router: routerElegido, // AÑADIDO PARA RED DE SENDEROS: router elegido según disponibilidad de la red propia
                 createMarker: function() { return null; }
             }).addTo(map);
 
@@ -1071,7 +1344,7 @@
             enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
                 event_category: 'Mapa UAGRM',
                 event_label: destino.nombre,
-                metodo_ruta: 'openrouteservice_peatonal',
+                metodo_ruta: usandoRedPropia ? 'red_senderos_propia' : 'openrouteservice_peatonal',
                 distancia_km: Number(dist.toFixed(3))
             });
 
@@ -1217,6 +1490,169 @@
     // 8. AJUSTE INICIAL
     // -------------------------------------------------------------
     setTimeout(() => map.invalidateSize(), 400);
+
+    // ===============================================================
+    // AÑADIDO PARA RED DE SENDEROS: editor visual + carga automática
+    // ===============================================================
+    let modoEditorSenderosActivo = false; // AÑADIDO PARA RED DE SENDEROS
+    let nodoSeleccionadoParaArista = null; // AÑADIDO PARA RED DE SENDEROS
+    const capaEditorSenderos = L.layerGroup().addTo(map); // AÑADIDO PARA RED DE SENDEROS
+    const marcadoresPorNodoId = {}; // AÑADIDO PARA RED DE SENDEROS
+
+    const btnToggleEditor = document.getElementById('btnToggleEditor');
+    const editorSenderosPanel = document.getElementById('editorSenderosPanel');
+    const editorContador = document.getElementById('editorContador');
+
+    // AÑADIDO PARA RED DE SENDEROS: icono pequeño para cada nodo de la red
+    function iconoNodoSendero(seleccionado) {
+        return L.divIcon({
+            className: '',
+            html: `<div class="nodo-sendero${seleccionado ? ' seleccionado' : ''}"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: redibuja todos los nodos y aristas
+    // actuales sobre el mapa (se llama tras cada cambio en la red)
+    function redibujarRedSenderos() {
+        capaEditorSenderos.clearLayers();
+        Object.keys(marcadoresPorNodoId).forEach(function(k) { delete marcadoresPorNodoId[k]; });
+
+        redSenderos.aristas.forEach(function(par) {
+            const nodoA = redSenderos.nodos.find(function(n) { return n.id === par[0]; });
+            const nodoB = redSenderos.nodos.find(function(n) { return n.id === par[1]; });
+            if (!nodoA || !nodoB) return;
+            L.polyline([[nodoA.lat, nodoA.lng], [nodoB.lat, nodoB.lng]], {
+                color: '#3E7CB1', weight: 3, opacity: 0.8, dashArray: '6 6'
+            }).addTo(capaEditorSenderos);
+        });
+
+        redSenderos.nodos.forEach(function(nodo) {
+            const marcador = L.marker([nodo.lat, nodo.lng], {
+                icon: iconoNodoSendero(nodoSeleccionadoParaArista === nodo.id)
+            }).addTo(capaEditorSenderos);
+
+            marcador.on('click', function(e) {
+                if (!modoEditorSenderosActivo) return;
+                L.DomEvent.stopPropagation(e); // evita que también se dispare el clic del mapa
+                if (nodoSeleccionadoParaArista === null) {
+                    nodoSeleccionadoParaArista = nodo.id;
+                } else if (nodoSeleccionadoParaArista === nodo.id) {
+                    nodoSeleccionadoParaArista = null; // deseleccionar
+                } else {
+                    redSenderos.aristas.push([nodoSeleccionadoParaArista, nodo.id]);
+                    nodoSeleccionadoParaArista = null;
+                }
+                redibujarRedSenderos();
+                actualizarContadorEditor();
+            });
+
+            marcadoresPorNodoId[nodo.id] = marcador;
+        });
+    }
+
+    function actualizarContadorEditor() {
+        editorContador.textContent = `${redSenderos.nodos.length} nodos · ${redSenderos.aristas.length} conexiones`;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: clic en el mapa (fuera de un nodo) agrega un nodo nuevo
+    map.on('click', function(e) {
+        if (!modoEditorSenderosActivo) return;
+        redSenderos.nodos.push({ id: siguienteIdNodo, lat: e.latlng.lat, lng: e.latlng.lng });
+        siguienteIdNodo++;
+        redibujarRedSenderos();
+        actualizarContadorEditor();
+    });
+
+    // AÑADIDO PARA RED DE SENDEROS: activar/desactivar el modo edición
+    btnToggleEditor.addEventListener('click', function() {
+        modoEditorSenderosActivo = !modoEditorSenderosActivo;
+        editorSenderosPanel.classList.toggle('hidden', !modoEditorSenderosActivo);
+        btnToggleEditor.classList.toggle('activo', modoEditorSenderosActivo);
+        btnToggleEditor.textContent = modoEditorSenderosActivo
+            ? '🛠️ Editor de senderos (ACTIVO — clic para salir)'
+            : '🛠️ Editor de senderos peatonales';
+        nodoSeleccionadoParaArista = null;
+        redibujarRedSenderos();
+    });
+
+    document.getElementById('btnDeshacerNodo').addEventListener('click', function() {
+        const eliminado = redSenderos.nodos.pop();
+        if (eliminado) {
+            // también se eliminan las aristas que usaban ese nodo
+            redSenderos.aristas = redSenderos.aristas.filter(function(par) {
+                return par[0] !== eliminado.id && par[1] !== eliminado.id;
+            });
+        }
+        redibujarRedSenderos();
+        actualizarContadorEditor();
+    });
+
+    document.getElementById('btnDeshacerArista').addEventListener('click', function() {
+        redSenderos.aristas.pop();
+        redibujarRedSenderos();
+        actualizarContadorEditor();
+    });
+
+    document.getElementById('btnLimpiarRed').addEventListener('click', function() {
+        if (!confirm('¿Seguro que quieres borrar toda la red de senderos dibujada?')) return;
+        redSenderos = { nodos: [], aristas: [] };
+        siguienteIdNodo = 1;
+        redibujarRedSenderos();
+        actualizarContadorEditor();
+    });
+
+    document.getElementById('btnExportarRed').addEventListener('click', function() {
+        const contenido = JSON.stringify(redSenderos, null, 2);
+        const blob = new Blob([contenido], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = 'senderos.json';
+        enlace.click();
+        URL.revokeObjectURL(url);
+        console.log('Red de senderos exportada:', redSenderos);
+    });
+
+    document.getElementById('inputImportarRed').addEventListener('change', function(e) {
+        const archivo = e.target.files[0];
+        if (!archivo) return;
+        const lector = new FileReader();
+        lector.onload = function(evento) {
+            try {
+                const datos = JSON.parse(evento.target.result);
+                if (!datos.nodos || !datos.aristas) throw new Error('Formato inválido');
+                redSenderos = datos;
+                siguienteIdNodo = Math.max(0, ...redSenderos.nodos.map(function(n) { return n.id; })) + 1;
+                redibujarRedSenderos();
+                actualizarContadorEditor();
+                alert('Red de senderos importada correctamente: ' + redSenderos.nodos.length + ' nodos.');
+            } catch (err) {
+                alert('El archivo no es un senderos.json válido.');
+            }
+        };
+        lector.readAsText(archivo);
+        e.target.value = '';
+    });
+
+    // AÑADIDO PARA RED DE SENDEROS: al cargar la página, intenta traer
+    // automáticamente un archivo senderos.json ubicado junto al
+    // index.html. Si no existe todavía (404), la app sigue funcionando
+    // normalmente con OpenRouteService como antes — no rompe nada.
+    fetch('senderos.json')
+        .then(function(r) { if (!r.ok) throw new Error('No hay senderos.json todavía'); return r.json(); })
+        .then(function(datos) {
+            redSenderos = datos;
+            siguienteIdNodo = Math.max(0, ...redSenderos.nodos.map(function(n) { return n.id; })) + 1;
+            redibujarRedSenderos();
+            actualizarContadorEditor();
+            console.log('✅ Red de senderos personalizada cargada (' + redSenderos.nodos.length + ' nodos). Se usará en vez de OpenRouteService para las rutas a pie.');
+        })
+        .catch(function() {
+            console.log('ℹ️ No se encontró senderos.json — se usará OpenRouteService para las rutas a pie.');
+        });
+
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
 </script>
 
