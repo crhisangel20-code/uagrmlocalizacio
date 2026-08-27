@@ -290,6 +290,33 @@
         .info-panel .btn-google:hover { background: #2f6693; }
         .info-panel .btn-google.hidden { display: none; }
 
+        /* AÑADIDO PARA OPENROUTESERVICE: panel de indicaciones paso a paso */
+        .instrucciones-panel {
+            margin-top: 16px;
+            padding: 16px 20px;
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1.5px solid rgba(11,110,79,0.18);
+        }
+        .instrucciones-panel h3 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--verde-oscuro);
+            margin-bottom: 10px;
+        }
+        .instrucciones-panel ol {
+            padding-left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .instrucciones-panel li {
+            font-size: 0.88rem;
+            color: var(--carbon);
+            line-height: 1.4;
+        }
+        .instrucciones-panel.hidden { display: none; }
+
         .footer-note {
             margin-top: 16px;
             font-size: 0.82rem;
@@ -488,7 +515,7 @@
             .btn-geo, .btn-calcular { width: 100%; text-align: center; }
             .leyenda { padding: 10px 12px; gap: 6px 12px; }
             .leyenda-item { font-size: 0.72rem; }
-            #mapid { height: 62vh; min-height: 320px; }
+            #mapid { height: 62vh; min-height: 320px; border-radius: 14px; }
             .info-panel { padding: 12px 14px; }
             .info-panel .message { font-size: 0.86rem; }
             .footer-note { font-size: 0.74rem; }
@@ -537,7 +564,6 @@
             <input type="text" id="originInput" placeholder="Origen (ej. Warnes, La Guardia, Av. San Martín)" />
             <button class="btn-calcular" id="btnCalcularRuta">➡️ Calcular ruta</button>
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
-            <button class="btn-geo" id="btnRutaPie" disabled>🚶 Iniciar ruta a pie</button>
         </div>
 
         <div class="leyenda" id="leyenda"></div>
@@ -549,6 +575,16 @@
             <a href="#" id="googleMapsLink" class="btn-google hidden" target="_blank">
                 🚗 Abrir en Google Maps
             </a>
+            <!-- AÑADIDO PARA OPENROUTESERVICE: botón para iniciar navegación peatonal en vivo -->
+            <button class="btn-google hidden" id="btnIniciarRutaPie" style="background: var(--verde-bandera);">
+                🚶 Iniciar ruta a pie
+            </button>
+        </div>
+
+        <!-- AÑADIDO PARA OPENROUTESERVICE: panel de indicaciones paso a paso -->
+        <div class="instrucciones-panel hidden" id="instruccionesPanel">
+            <h3>🚶 Indicaciones paso a paso</h3>
+            <ol id="listaInstrucciones"></ol>
         </div>
 
         <div class="footer-note">
@@ -629,10 +665,27 @@
                     );
                     const resumen = (feature.properties && feature.properties.summary) || {};
 
+                    // AÑADIDO PARA OPENROUTESERVICE: extraer indicaciones
+                    // paso a paso (steps) que ORS ya devuelve en texto
+                    // legible, para mostrarlas en un panel propio en vez
+                    // de depender del formateador interno de Leaflet
+                    // Routing Machine (que no reconoce el formato de ORS).
+                    const segmentos = (feature.properties && feature.properties.segments) || [];
+                    const pasos = [];
+                    segmentos.forEach(function(seg) {
+                        (seg.steps || []).forEach(function(paso) {
+                            pasos.push({
+                                instruccion: paso.instruction,
+                                distanciaMetros: Math.round(paso.distance || 0)
+                            });
+                        });
+                    });
+
                     const ruta = {
                         name: 'Ruta peatonal (OpenRouteService)',
                         coordinates: coordenadasRuta,
                         instructions: [],
+                        pasos: pasos, // AÑADIDO PARA OPENROUTESERVICE
                         summary: {
                             totalDistance: resumen.distance || 0,
                             totalTime: resumen.duration || 0
@@ -845,10 +898,6 @@
             event_label: edificioSeleccionado ? edificioSeleccionado.nombre : ''
         });
 
-        // AÑADIDO PARA BOTÓN "INICIAR RUTA A PIE": se habilita al seleccionar un edificio destino
-        const btnPie = document.getElementById('btnRutaPie'); // AÑADIDO PARA BOTÓN RUTA A PIE
-        if (btnPie) btnPie.disabled = false; // AÑADIDO PARA BOTÓN RUTA A PIE
-
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
         markers[id].openPopup();
@@ -872,6 +921,26 @@
     let userLocation = null;
     let destinoActual = null;
     let watchId = null;
+    let modoNavegacionActivo = false; // AÑADIDO PARA OPENROUTESERVICE
+    const panelInstrucciones = document.getElementById('instruccionesPanel'); // AÑADIDO PARA OPENROUTESERVICE
+    const listaInstrucciones = document.getElementById('listaInstrucciones'); // AÑADIDO PARA OPENROUTESERVICE
+    const btnIniciarRutaPie = document.getElementById('btnIniciarRutaPie'); // AÑADIDO PARA OPENROUTESERVICE
+
+    // AÑADIDO PARA OPENROUTESERVICE: pinta la lista de indicaciones paso a paso
+    // usando el texto que ya viene listo desde OpenRouteService.
+    function mostrarInstruccionesPeatonales(pasos) {
+        listaInstrucciones.innerHTML = '';
+        if (!pasos || !pasos.length) {
+            panelInstrucciones.classList.add('hidden');
+            return;
+        }
+        pasos.forEach(function(paso) {
+            const li = document.createElement('li');
+            li.textContent = paso.instruccion + (paso.distanciaMetros > 0 ? ` (${paso.distanciaMetros} m)` : '');
+            listaInstrucciones.appendChild(li);
+        });
+        panelInstrucciones.classList.remove('hidden');
+    }
 
     function distancia(lat1, lng1, lat2, lng2) {
         const R = 6371;
@@ -901,6 +970,12 @@
         destinoActual = destino;
         const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
 
+        // AÑADIDO PARA OPENROUTESERVICE: reiniciar estado de navegación/instrucciones
+        // cada vez que se calcula una ruta nueva (nuevo destino u origen)
+        modoNavegacionActivo = false;
+        btnIniciarRutaPie.classList.add('hidden');
+        panelInstrucciones.classList.add('hidden');
+
         if (window.routingControl) {
             map.removeControl(window.routingControl);
             window.routingControl = null;
@@ -926,6 +1001,10 @@
             const bounds = L.latLngBounds([originLatLng.lat, originLatLng.lng], [destino.lat, destino.lng]);
             map.fitBounds(bounds, { padding: [50, 50] });
 
+            // AÑADIDO PARA OPENROUTESERVICE: no aplica navegación peatonal en este caso
+            btnIniciarRutaPie.classList.add('hidden');
+            panelInstrucciones.classList.add('hidden');
+
             // AÑADIDO PARA GA4: evento de ruta calculada (modo Google Maps, > 1 km)
             enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
                 event_category: 'Mapa UAGRM',
@@ -943,7 +1022,7 @@
                     L.latLng(destino.lat, destino.lng)
                 ],
                 routeWhileDragging: true,
-                show: true,
+                show: false, // AÑADIDO PARA OPENROUTESERVICE: se desactiva el panel por defecto de LRM (no entiende el formato de ORS); usamos nuestro propio panel de instrucciones
                 showAlternatives: false,
                 lineOptions: {
                     styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
@@ -953,6 +1032,26 @@
                 }),
                 createMarker: function() { return null; }
             }).addTo(map);
+
+            // AÑADIDO PARA OPENROUTESERVICE: cuando la ruta llega bien,
+            // mostramos las indicaciones paso a paso y el botón para
+            // iniciar la navegación en vivo.
+            window.routingControl.on('routesfound', function(e) {
+                const ruta = e.routes && e.routes[0];
+                mostrarInstruccionesPeatonales(ruta ? ruta.pasos : []);
+                btnIniciarRutaPie.classList.remove('hidden');
+            });
+
+            // AÑADIDO PARA OPENROUTESERVICE: si el proxy o ORS fallan
+            // (por ejemplo, un problema de CORS o de conexión), se lo
+            // avisamos al usuario en vez de dejar la línea verde ausente
+            // sin ninguna explicación.
+            window.routingControl.on('routingerror', function(e) {
+                console.error('Error de enrutamiento peatonal:', e.error);
+                statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta peatonal (revisa el proxy de OpenRouteService). Intenta de nuevo.';
+                btnIniciarRutaPie.classList.add('hidden');
+                panelInstrucciones.classList.add('hidden');
+            });
 
             window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
                 .addTo(map).bindPopup('📍 Origen').openPopup();
@@ -973,6 +1072,17 @@
                 function(pos) {
                     const userLat = pos.coords.latitude;
                     const userLng = pos.coords.longitude;
+
+                    // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
+                    // "Iniciar ruta a pie", seguimos su posición en vivo
+                    // recentrando el mapa y moviendo el marcador de origen.
+                    if (modoNavegacionActivo) {
+                        if (window.originMarker) {
+                            window.originMarker.setLatLng([userLat, userLng]);
+                        }
+                        map.setView([userLat, userLng], 19, { animate: true });
+                    }
+
                     const d = distancia(userLat, userLng, destino.lat, destino.lng);
                     if (d <= 0.1) {
                         statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea verde para llegar a tu destino.';
@@ -989,6 +1099,19 @@
             );
         }
     }
+
+    // AÑADIDO PARA OPENROUTESERVICE: al presionar "Iniciar ruta a pie" se
+    // activa el modo de seguimiento en vivo (el mapa se recentra en tu
+    // posición en cada actualización del GPS) y se resalta el inicio de
+    // la navegación.
+    btnIniciarRutaPie.addEventListener('click', function() {
+        modoNavegacionActivo = true;
+        statusMsg.innerHTML = '🚶 Navegación iniciada. Sigue la línea verde y las indicaciones de abajo.';
+        this.classList.add('hidden');
+        if (panelInstrucciones) {
+            panelInstrucciones.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
 
     document.getElementById('btnMiUbicacion').addEventListener('click', function() {
         if (!navigator.geolocation) {
@@ -1022,123 +1145,6 @@
                 alert(msg);
                 document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
                 document.getElementById('btnMiUbicacion').disabled = false;
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    });
-
-    // ===============================================================
-    // AÑADIDO PARA BOTÓN "INICIAR RUTA A PIE"
-    // Fuerza la navegación peatonal (OpenRouteService) con seguimiento
-    // GPS en vivo, sin pasar por la sugerencia de Google Maps, sin
-    // importar la distancia. Se activa desde el botón dedicado que
-    // aparece habilitado luego de seleccionar un edificio destino.
-    // ===============================================================
-    function iniciarRutaPieForzada(originLatLng, destino) { // AÑADIDO PARA BOTÓN RUTA A PIE
-        destinoActual = destino;
-
-        if (window.routingControl) {
-            map.removeControl(window.routingControl);
-            window.routingControl = null;
-        }
-        if (window.originMarker) {
-            map.removeLayer(window.originMarker);
-            window.originMarker = null;
-        }
-        if (window.destMarker) {
-            map.removeLayer(window.destMarker);
-            window.destMarker = null;
-        }
-
-        googleBtn.classList.add('hidden');
-        const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
-        statusMsg.innerHTML = `🚶 Ruta a pie iniciada (${dist.toFixed(2)} km). Sigue la línea verde.`;
-
-        window.routingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(originLatLng.lat, originLatLng.lng),
-                L.latLng(destino.lat, destino.lng)
-            ],
-            routeWhileDragging: true,
-            show: true,
-            showAlternatives: false,
-            lineOptions: {
-                styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
-            },
-            router: new L.Routing.ORSRouter({
-                proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/'
-            }),
-            createMarker: function() { return null; }
-        }).addTo(map);
-
-        window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
-            .addTo(map).bindPopup('📍 Origen').openPopup();
-        window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
-            .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
-
-        enviarEventoGA4('ruta_a_pie_iniciada', {
-            event_category: 'Mapa UAGRM',
-            event_label: destino.nombre,
-            metodo_ruta: 'openrouteservice_peatonal_forzada',
-            distancia_km: Number(dist.toFixed(3))
-        });
-
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        window.alertaMostrada = false;
-        watchId = navigator.geolocation.watchPosition(
-            function(pos) {
-                const userLat = pos.coords.latitude;
-                const userLng = pos.coords.longitude;
-                const d = distancia(userLat, userLng, destino.lat, destino.lng);
-                if (d <= 0.1) {
-                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea verde para llegar a tu destino.';
-                    if (!window.alertaMostrada) {
-                        alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea verde en el mapa.');
-                        window.alertaMostrada = true;
-                    }
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                }
-            },
-            function(err) { console.warn('Error en watchPosition:', err); },
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-        );
-    }
-
-    document.getElementById('btnRutaPie').addEventListener('click', function() { // AÑADIDO PARA BOTÓN RUTA A PIE
-        if (!navigator.geolocation) {
-            alert('Tu navegador no soporta GPS.');
-            return;
-        }
-        if (!selectedBuildingId) {
-            alert('Primero selecciona un edificio destino.');
-            return;
-        }
-        const destino = edificios.find(e => e.id === selectedBuildingId);
-        if (!destino) return;
-
-        const btnRef = this;
-        const textoOriginal = btnRef.innerHTML;
-        btnRef.textContent = '🔄 Buscando GPS...';
-        btnRef.disabled = true;
-
-        navigator.geolocation.getCurrentPosition(
-            function(pos) {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                userLocation = { lat, lng };
-                btnRef.innerHTML = textoOriginal;
-                btnRef.disabled = false;
-                map.setView([lat, lng], 17, { animate: true });
-                iniciarRutaPieForzada(userLocation, destino);
-            },
-            function(err) {
-                let msg = 'No se pudo obtener ubicación. ';
-                if (err.code === 1) msg += 'Permite el acceso en el navegador.';
-                else msg += 'Intenta de nuevo.';
-                alert(msg);
-                btnRef.innerHTML = textoOriginal;
-                btnRef.disabled = false;
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
