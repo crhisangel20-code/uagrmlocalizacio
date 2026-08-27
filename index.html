@@ -24,6 +24,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
 
+    <!-- AÑADIDO PARA GA4: Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-0XWZF34L0N"></script>
+    <script>
+      // AÑADIDO PARA GA4: inicialización de dataLayer y configuración del ID de medición
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-0XWZF34L0N');
+    </script>
+
     <style>
         :root {
             /* ---- Paleta cruceña: bandera verde-blanco-verde + escudo (sol, oro, cielo, tierra) ---- */
@@ -553,6 +563,13 @@
 <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
 
 <script>
+    // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
+    function enviarEventoGA4(nombreEvento, datos) { // AÑADIDO PARA GA4
+        if (typeof gtag === 'function') {
+            gtag('event', nombreEvento, datos);
+        }
+    }
+
     // -------------------------------------------------------------
     // 1. DATOS DE EDIFICIOS
     // -------------------------------------------------------------
@@ -701,6 +718,15 @@
         const marker = L.marker([ed.lat, ed.lng], { icon: crearIcono(cat, esSede) })
             .addTo(map)
             .bindPopup(popupContent);
+
+        // AÑADIDO PARA GA4: evento al hacer clic en un marcador/pin del mapa
+        marker.on('click', function() { // AÑADIDO PARA GA4
+            enviarEventoGA4('clic_marcador', { // AÑADIDO PARA GA4
+                event_category: 'Mapa UAGRM',
+                event_label: ed.nombre
+            });
+        });
+
         markers[ed.id] = marker;
     });
 
@@ -730,6 +756,14 @@
         const id = parseInt(this.value, 10);
         if (!id || !markers[id]) return;
         selectedBuildingId = id;
+        const edificioSeleccionado = edificios.find(e => e.id === id); // AÑADIDO PARA GA4 (referencia usada abajo)
+
+        // AÑADIDO PARA GA4: evento al seleccionar un edificio en el <select>
+        enviarEventoGA4('seleccion_edificio', { // AÑADIDO PARA GA4
+            event_category: 'Mapa UAGRM',
+            event_label: edificioSeleccionado ? edificioSeleccionado.nombre : ''
+        });
+
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
         markers[id].openPopup();
@@ -806,6 +840,14 @@
                 .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
             const bounds = L.latLngBounds([originLatLng.lat, originLatLng.lng], [destino.lat, destino.lng]);
             map.fitBounds(bounds, { padding: [50, 50] });
+
+            // AÑADIDO PARA GA4: evento de ruta calculada (modo Google Maps, > 1 km)
+            enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
+                event_category: 'Mapa UAGRM',
+                event_label: destino.nombre,
+                metodo_ruta: 'google_maps',
+                distancia_km: Number(dist.toFixed(2))
+            });
         } else {
             googleBtn.classList.add('hidden');
             statusMsg.innerHTML = `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal. Sigue la línea verde.`;
@@ -829,6 +871,14 @@
                 .addTo(map).bindPopup('📍 Origen').openPopup();
             window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
                 .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+
+            // AÑADIDO PARA GA4: evento de ruta calculada (modo peatonal Leaflet Routing, ≤ 1 km)
+            enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
+                event_category: 'Mapa UAGRM',
+                event_label: destino.nombre,
+                metodo_ruta: 'leaflet_routing_peatonal',
+                distancia_km: Number(dist.toFixed(3))
+            });
 
             if (watchId) navigator.geolocation.clearWatch(watchId);
             window.alertaMostrada = false;
