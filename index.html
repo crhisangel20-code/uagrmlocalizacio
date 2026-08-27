@@ -488,7 +488,7 @@
             .btn-geo, .btn-calcular { width: 100%; text-align: center; }
             .leyenda { padding: 10px 12px; gap: 6px 12px; }
             .leyenda-item { font-size: 0.72rem; }
-            #mapid { height: 62vh; min-height: 320px; border-radius: 14px; }
+            #mapid { height: 62vh; min-height: 320px; }
             .info-panel { padding: 12px 14px; }
             .info-panel .message { font-size: 0.86rem; }
             .footer-note { font-size: 0.74rem; }
@@ -537,6 +537,7 @@
             <input type="text" id="originInput" placeholder="Origen (ej. Warnes, La Guardia, Av. San Martín)" />
             <button class="btn-calcular" id="btnCalcularRuta">➡️ Calcular ruta</button>
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
+            <button class="btn-geo" id="btnRutaPie" disabled>🚶 Iniciar ruta a pie</button>
         </div>
 
         <div class="leyenda" id="leyenda"></div>
@@ -569,6 +570,86 @@
             gtag('event', nombreEvento, datos);
         }
     }
+
+    // ===============================================================
+    // AÑADIDO PARA OPENROUTESERVICE: router personalizado compatible
+    // con Leaflet Routing Machine que llama al proxy en Cloudflare
+    // Workers (la clave API de ORS queda oculta dentro del proxy, el
+    // cliente nunca la ve ni la envía).
+    //
+    // Contrato confirmado con el Worker real:
+    // - El Worker reenvía el body tal cual a
+    //   https://api.heigit.org/v2/directions/foot-walking/geojson
+    // - El body solo debe contener { coordinates: [[lng,lat], ...] }
+    //   (perfil y formato ya van fijos en la URL dentro del Worker).
+    // - La respuesta es el GeoJSON FeatureCollection que devuelve ORS.
+    // ===============================================================
+    L.Routing.ORSRouter = L.Class.extend({ // AÑADIDO PARA OPENROUTESERVICE
+        options: {
+            proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/'
+        },
+
+        initialize: function(options) { // AÑADIDO PARA OPENROUTESERVICE
+            L.Util.setOptions(this, options);
+        },
+
+        route: function(waypoints, callback, context) { // AÑADIDO PARA OPENROUTESERVICE
+            // ORS espera coordenadas como [longitud, latitud]
+            const coordinates = waypoints.map(wp => [wp.latLng.lng, wp.latLng.lat]);
+
+            // IMPORTANTE: el proxy ya fija el perfil ('foot-walking') y el
+            // formato ('geojson') en la URL de destino
+            // (https://api.heigit.org/v2/directions/foot-walking/geojson),
+            // así que el body solo debe llevar 'coordinates'. ORS valida
+            // estrictamente el esquema y rechaza propiedades no permitidas
+            // como 'profile' o 'format' dentro del JSON.
+            const cuerpoPeticion = {
+                coordinates: coordinates
+            };
+
+            fetch(this.options.proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cuerpoPeticion)
+            })
+                .then(function(respuesta) {
+                    if (!respuesta.ok) {
+                        throw new Error('El proxy de OpenRouteService respondió con estado ' + respuesta.status);
+                    }
+                    return respuesta.json();
+                })
+                .then(function(datos) {
+                    const feature = datos && datos.features && datos.features[0];
+                    if (!feature) {
+                        throw new Error('La respuesta del proxy ORS no contiene una ruta válida.');
+                    }
+
+                    const coordenadasRuta = feature.geometry.coordinates.map(
+                        c => L.latLng(c[1], c[0])
+                    );
+                    const resumen = (feature.properties && feature.properties.summary) || {};
+
+                    const ruta = {
+                        name: 'Ruta peatonal (OpenRouteService)',
+                        coordinates: coordenadasRuta,
+                        instructions: [],
+                        summary: {
+                            totalDistance: resumen.distance || 0,
+                            totalTime: resumen.duration || 0
+                        },
+                        inputWaypoints: waypoints,
+                        waypoints: waypoints,
+                        actualWaypoints: waypoints
+                    };
+
+                    callback.call(context, null, [ruta]);
+                })
+                .catch(function(error) {
+                    console.error('Error al calcular ruta con ORS vía proxy:', error);
+                    callback.call(context, { status: -1, message: error.message });
+                });
+        }
+    });
 
     // -------------------------------------------------------------
     // 1. DATOS DE EDIFICIOS
@@ -764,6 +845,10 @@
             event_label: edificioSeleccionado ? edificioSeleccionado.nombre : ''
         });
 
+        // AÑADIDO PARA BOTÓN "INICIAR RUTA A PIE": se habilita al seleccionar un edificio destino
+        const btnPie = document.getElementById('btnRutaPie'); // AÑADIDO PARA BOTÓN RUTA A PIE
+        if (btnPie) btnPie.disabled = false; // AÑADIDO PARA BOTÓN RUTA A PIE
+
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
         markers[id].openPopup();
@@ -850,7 +935,7 @@
             });
         } else {
             googleBtn.classList.add('hidden');
-            statusMsg.innerHTML = `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal. Sigue la línea verde.`;
+            statusMsg.innerHTML = `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (OpenRouteService). Sigue la línea verde.`;
 
             window.routingControl = L.Routing.control({
                 waypoints: [
@@ -863,7 +948,9 @@
                 lineOptions: {
                     styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
                 },
-                router: L.Routing.osrmv1({ profile: 'foot' }),
+                router: new L.Routing.ORSRouter({ // AÑADIDO PARA OPENROUTESERVICE: reemplaza L.Routing.osrmv1
+                    proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/'
+                }),
                 createMarker: function() { return null; }
             }).addTo(map);
 
@@ -876,7 +963,7 @@
             enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
                 event_category: 'Mapa UAGRM',
                 event_label: destino.nombre,
-                metodo_ruta: 'leaflet_routing_peatonal',
+                metodo_ruta: 'openrouteservice_peatonal',
                 distancia_km: Number(dist.toFixed(3))
             });
 
@@ -935,6 +1022,123 @@
                 alert(msg);
                 document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
                 document.getElementById('btnMiUbicacion').disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    });
+
+    // ===============================================================
+    // AÑADIDO PARA BOTÓN "INICIAR RUTA A PIE"
+    // Fuerza la navegación peatonal (OpenRouteService) con seguimiento
+    // GPS en vivo, sin pasar por la sugerencia de Google Maps, sin
+    // importar la distancia. Se activa desde el botón dedicado que
+    // aparece habilitado luego de seleccionar un edificio destino.
+    // ===============================================================
+    function iniciarRutaPieForzada(originLatLng, destino) { // AÑADIDO PARA BOTÓN RUTA A PIE
+        destinoActual = destino;
+
+        if (window.routingControl) {
+            map.removeControl(window.routingControl);
+            window.routingControl = null;
+        }
+        if (window.originMarker) {
+            map.removeLayer(window.originMarker);
+            window.originMarker = null;
+        }
+        if (window.destMarker) {
+            map.removeLayer(window.destMarker);
+            window.destMarker = null;
+        }
+
+        googleBtn.classList.add('hidden');
+        const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
+        statusMsg.innerHTML = `🚶 Ruta a pie iniciada (${dist.toFixed(2)} km). Sigue la línea verde.`;
+
+        window.routingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(originLatLng.lat, originLatLng.lng),
+                L.latLng(destino.lat, destino.lng)
+            ],
+            routeWhileDragging: true,
+            show: true,
+            showAlternatives: false,
+            lineOptions: {
+                styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
+            },
+            router: new L.Routing.ORSRouter({
+                proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/'
+            }),
+            createMarker: function() { return null; }
+        }).addTo(map);
+
+        window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
+            .addTo(map).bindPopup('📍 Origen').openPopup();
+        window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
+            .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+
+        enviarEventoGA4('ruta_a_pie_iniciada', {
+            event_category: 'Mapa UAGRM',
+            event_label: destino.nombre,
+            metodo_ruta: 'openrouteservice_peatonal_forzada',
+            distancia_km: Number(dist.toFixed(3))
+        });
+
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        window.alertaMostrada = false;
+        watchId = navigator.geolocation.watchPosition(
+            function(pos) {
+                const userLat = pos.coords.latitude;
+                const userLng = pos.coords.longitude;
+                const d = distancia(userLat, userLng, destino.lat, destino.lng);
+                if (d <= 0.1) {
+                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea verde para llegar a tu destino.';
+                    if (!window.alertaMostrada) {
+                        alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea verde en el mapa.');
+                        window.alertaMostrada = true;
+                    }
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+            },
+            function(err) { console.warn('Error en watchPosition:', err); },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+        );
+    }
+
+    document.getElementById('btnRutaPie').addEventListener('click', function() { // AÑADIDO PARA BOTÓN RUTA A PIE
+        if (!navigator.geolocation) {
+            alert('Tu navegador no soporta GPS.');
+            return;
+        }
+        if (!selectedBuildingId) {
+            alert('Primero selecciona un edificio destino.');
+            return;
+        }
+        const destino = edificios.find(e => e.id === selectedBuildingId);
+        if (!destino) return;
+
+        const btnRef = this;
+        const textoOriginal = btnRef.innerHTML;
+        btnRef.textContent = '🔄 Buscando GPS...';
+        btnRef.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                userLocation = { lat, lng };
+                btnRef.innerHTML = textoOriginal;
+                btnRef.disabled = false;
+                map.setView([lat, lng], 17, { animate: true });
+                iniciarRutaPieForzada(userLocation, destino);
+            },
+            function(err) {
+                let msg = 'No se pudo obtener ubicación. ';
+                if (err.code === 1) msg += 'Permite el acceso en el navegador.';
+                else msg += 'Intenta de nuevo.';
+                alert(msg);
+                btnRef.innerHTML = textoOriginal;
+                btnRef.disabled = false;
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
