@@ -1656,13 +1656,12 @@
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
 </script>
 <!-- ============================================================
-     DIAGNÓSTICO AUTOMÁTICO DE RED DE SENDEROS
-     Pega este bloque completo justo ANTES de la línea que dice
-     </body>  (al final del archivo index.html)
+     DIAGNÓSTICO AUTOMÁTICO DE RED DE SENDEROS (v2 - corregido)
+     Reemplaza el bloque anterior por este, justo ANTES de </body>
      ============================================================ -->
 <script>
 setTimeout(function diagnosticarRedSenderos() {
-    if (!window.redSenderos || !redSenderos.nodos || !redSenderos.nodos.length) {
+    if (typeof redSenderos === 'undefined' || !redSenderos.nodos || !redSenderos.nodos.length) {
         alert('⚠️ No se cargó la red de senderos todavía. Espera unos segundos más y recarga la página.');
         return;
     }
@@ -1671,8 +1670,9 @@ setTimeout(function diagnosticarRedSenderos() {
     const aristas = redSenderos.aristas;
 
     const grafo = {};
-    nodos.forEach(n => grafo[n.id] = []);
-    aristas.forEach(([a, b]) => {
+    nodos.forEach(function(n) { grafo[n.id] = []; });
+    aristas.forEach(function(par) {
+        const a = par[0], b = par[1];
         if (grafo[a] && grafo[b]) {
             grafo[a].push(b);
             grafo[b].push(a);
@@ -1682,7 +1682,7 @@ setTimeout(function diagnosticarRedSenderos() {
     const visitado = new Set();
     const islas = [];
 
-    nodos.forEach(nodoInicial => {
+    nodos.forEach(function(nodoInicial) {
         if (visitado.has(nodoInicial.id)) return;
         const isla = [];
         const cola = [nodoInicial.id];
@@ -1690,7 +1690,7 @@ setTimeout(function diagnosticarRedSenderos() {
         while (cola.length) {
             const actual = cola.pop();
             isla.push(actual);
-            (grafo[actual] || []).forEach(vecino => {
+            (grafo[actual] || []).forEach(function(vecino) {
                 if (!visitado.has(vecino)) {
                     visitado.add(vecino);
                     cola.push(vecino);
@@ -1700,7 +1700,7 @@ setTimeout(function diagnosticarRedSenderos() {
         islas.push(isla);
     });
 
-    islas.sort((a, b) => b.length - a.length);
+    islas.sort(function(a, b) { return b.length - a.length; });
 
     let mensaje = 'DIAGNÓSTICO DE RED DE SENDEROS\n';
     mensaje += '================================\n';
