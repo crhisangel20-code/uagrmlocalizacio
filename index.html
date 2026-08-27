@@ -640,7 +640,9 @@
             // estrictamente el esquema y rechaza propiedades no permitidas
             // como 'profile' o 'format' dentro del JSON.
             const cuerpoPeticion = {
-                coordinates: coordinates
+                coordinates: coordinates,
+                language: 'es', // AÑADIDO PARA OPENROUTESERVICE: indicaciones en español
+                preference: 'shortest' // AÑADIDO PARA OPENROUTESERVICE: intenta usar el camino más corto/directo en vez del más rápido por calle
             };
 
             fetch(this.options.proxyUrl, {
