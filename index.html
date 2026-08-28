@@ -1508,7 +1508,7 @@
     // ===============================================================
     let modoEditorSenderosActivo = false; // AÑADIDO PARA RED DE SENDEROS
     let nodoSeleccionadoParaArista = null; // AÑADIDO PARA RED DE SENDEROS
-    const capaEditorSenderos = L.layerGroup().addTo(map); // AÑADIDO PARA RED DE SENDEROS
+    const capaEditorSenderos = L.layerGroup(); // AÑADIDO PARA RED DE SENDEROS: ya no se añade al mapa por defecto — solo se muestra en modo edición
     const marcadoresPorNodoId = {}; // AÑADIDO PARA RED DE SENDEROS
 
     const btnToggleEditor = document.getElementById('btnToggleEditor');
@@ -1686,6 +1686,17 @@
             ? '🛠️ Editor de senderos (ACTIVO — clic para salir)'
             : '🛠️ Editor de senderos peatonales';
         nodoSeleccionadoParaArista = null;
+
+        // AÑADIDO PARA RED DE SENDEROS: la red (nodos + líneas azules) solo
+        // se muestra en el mapa mientras el modo edición está activo; para
+        // cualquier visitante normal queda invisible, solo se ve la línea
+        // verde de la ruta calculada.
+        if (modoEditorSenderosActivo) {
+            capaEditorSenderos.addTo(map);
+        } else {
+            map.removeLayer(capaEditorSenderos);
+        }
+
         redibujarRedSenderos();
     });
 
