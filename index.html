@@ -390,8 +390,19 @@
             background: var(--oro-escudo);
         }
         .nodo-sendero.desconectado {
-            background: #B23A48;
-            box-shadow: 0 0 0 3px rgba(178,58,72,0.4);
+            width: 26px;
+            height: 26px;
+            margin-left: -6px;
+            margin-top: -6px;
+            background: #ff2d2d;
+            border: 3px solid #fff;
+            box-shadow: 0 0 0 4px rgba(255,45,45,0.5);
+            animation: pulsoDesconectado 1s ease-in-out infinite;
+            z-index: 1000;
+        }
+        @keyframes pulsoDesconectado {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.35); }
         }
 
         .footer-note {
@@ -677,6 +688,8 @@
                     <strong>Modo edición ACTIVO.</strong> Haz clic en el mapa para agregar puntos (nodos) sobre los
                     senderos reales del campus. Luego haz clic en dos nodos seguidos para conectarlos con un tramo
                     caminable. Repite hasta cubrir toda la red de senderos que quieres usar.
+                    <br><strong>Para borrar un nodo puntual:</strong> mantén presionada la tecla <kbd>Shift</kbd> y haz
+                    clic sobre ese nodo (también borra sus conexiones).
                 </p>
                 <div class="editor-botones">
                     <button id="btnDeshacerNodo">↩️ Deshacer último nodo</button>
@@ -1582,11 +1595,23 @@
             alert('✅ ¡Toda la red está conectada! Un solo grupo de ' + grupos[0].length + ' nodos.');
         } else {
             const totalDesconectados = nodosDesconectadosActuales.size;
+
+            // AÑADIDO PARA RED DE SENDEROS: centrar el mapa automáticamente
+            // sobre los nodos desconectados, en vez de dejar que el
+            // usuario los busque a ojo entre todos los demás pines.
+            const coordsDesconectados = redSenderos.nodos
+                .filter(function(n) { return nodosDesconectadosActuales.has(n.id); })
+                .map(function(n) { return [n.lat, n.lng]; });
+            if (coordsDesconectados.length) {
+                map.fitBounds(L.latLngBounds(coordsDesconectados), { padding: [100, 100], maxZoom: 20 });
+            }
+
             alert(
                 '⚠️ Se encontraron ' + grupos.length + ' grupos separados.\n' +
                 'Grupo principal: ' + grupos[0].length + ' nodos.\n' +
-                totalDesconectados + ' nodos quedaron resaltados en ROJO sobre el mapa — ' +
-                'conéctalos al resto haciendo clic en un nodo rojo y luego en uno azul cercano.'
+                totalDesconectados + ' nodos desconectados — el mapa se movió hacia ellos. ' +
+                'Búscalos como círculos ROJOS GRANDES que laten (pulsan). ' +
+                'Haz clic en uno rojo y luego en un nodo azul cercano para conectarlos.'
             );
         }
     });
@@ -1614,6 +1639,20 @@
             marcador.on('click', function(e) {
                 if (!modoEditorSenderosActivo) return;
                 L.DomEvent.stopPropagation(e); // evita que también se dispare el clic del mapa
+
+                // AÑADIDO PARA RED DE SENDEROS: Shift+clic elimina ese nodo puntual y sus conexiones
+                if (e.originalEvent && e.originalEvent.shiftKey) {
+                    redSenderos.nodos = redSenderos.nodos.filter(function(n) { return n.id !== nodo.id; });
+                    redSenderos.aristas = redSenderos.aristas.filter(function(par) {
+                        return par[0] !== nodo.id && par[1] !== nodo.id;
+                    });
+                    if (nodoSeleccionadoParaArista === nodo.id) nodoSeleccionadoParaArista = null;
+                    nodosDesconectadosActuales.delete(nodo.id);
+                    redibujarRedSenderos();
+                    actualizarContadorEditor();
+                    return;
+                }
+
                 if (nodoSeleccionadoParaArista === null) {
                     nodoSeleccionadoParaArista = nodo.id;
                 } else if (nodoSeleccionadoParaArista === nodo.id) {
