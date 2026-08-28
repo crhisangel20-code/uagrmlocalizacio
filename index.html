@@ -389,6 +389,10 @@
         .nodo-sendero.seleccionado {
             background: var(--oro-escudo);
         }
+        .nodo-sendero.desconectado {
+            background: #B23A48;
+            box-shadow: 0 0 0 3px rgba(178,58,72,0.4);
+        }
 
         .footer-note {
             margin-top: 16px;
@@ -679,6 +683,7 @@
                     <button id="btnDeshacerArista">↩️ Deshacer última conexión</button>
                     <button id="btnLimpiarRed">🗑️ Limpiar todo</button>
                     <button id="btnExportarRed">💾 Exportar senderos.json</button>
+                    <button id="btnVerificarConectividad">🔎 Verificar conectividad</button>
                     <label class="btn-importar">
                         📂 Importar senderos.json
                         <input type="file" id="inputImportarRed" accept="application/json" hidden />
@@ -1503,15 +1508,88 @@
     const editorSenderosPanel = document.getElementById('editorSenderosPanel');
     const editorContador = document.getElementById('editorContador');
 
+    // AÑADIDO PARA RED DE SENDEROS: guarda qué nodos quedaron marcados
+    // como desconectados en la última verificación, para pintarlos en rojo
+    let nodosDesconectadosActuales = new Set(); // AÑADIDO PARA RED DE SENDEROS
+
     // AÑADIDO PARA RED DE SENDEROS: icono pequeño para cada nodo de la red
-    function iconoNodoSendero(seleccionado) {
+    function iconoNodoSendero(seleccionado, desconectado) {
+        let clase = 'nodo-sendero';
+        if (desconectado) clase += ' desconectado';
+        else if (seleccionado) clase += ' seleccionado';
         return L.divIcon({
             className: '',
-            html: `<div class="nodo-sendero${seleccionado ? ' seleccionado' : ''}"></div>`,
+            html: `<div class="${clase}"></div>`,
             iconSize: [14, 14],
             iconAnchor: [7, 7]
         });
     }
+
+    // AÑADIDO PARA RED DE SENDEROS: recorre la red con BFS y devuelve la
+    // lista de "islas" (grupos de nodos conectados entre sí pero
+    // separados del resto). La primera es siempre la más grande.
+    function calcularGruposConectados() {
+        const grafo = {};
+        redSenderos.nodos.forEach(function(n) { grafo[n.id] = []; });
+        redSenderos.aristas.forEach(function(par) {
+            if (!grafo[par[0]] || !grafo[par[1]]) return;
+            grafo[par[0]].push(par[1]);
+            grafo[par[1]].push(par[0]);
+        });
+        const visitados = new Set();
+        function bfs(inicio) {
+            const cola = [inicio];
+            visitados.add(inicio);
+            const grupo = [inicio];
+            while (cola.length) {
+                const actual = cola.shift();
+                (grafo[actual] || []).forEach(function(vecino) {
+                    if (!visitados.has(vecino)) {
+                        visitados.add(vecino);
+                        cola.push(vecino);
+                        grupo.push(vecino);
+                    }
+                });
+            }
+            return grupo;
+        }
+        const grupos = [];
+        redSenderos.nodos.forEach(function(n) {
+            if (!visitados.has(n.id)) grupos.push(bfs(n.id));
+        });
+        grupos.sort(function(a, b) { return b.length - a.length; });
+        return grupos;
+    }
+
+    // AÑADIDO PARA RED DE SENDEROS: botón de verificación de conectividad.
+    // Resalta en rojo sobre el mapa los nodos que NO pertenecen al grupo
+    // principal, para que sea visual encontrarlos y arreglarlos.
+    document.getElementById('btnVerificarConectividad').addEventListener('click', function() {
+        if (!redSenderos.nodos.length) {
+            alert('Todavía no hay nodos dibujados.');
+            return;
+        }
+        const grupos = calcularGruposConectados();
+        nodosDesconectadosActuales = new Set();
+        if (grupos.length > 1) {
+            for (let i = 1; i < grupos.length; i++) {
+                grupos[i].forEach(function(id) { nodosDesconectadosActuales.add(id); });
+            }
+        }
+        redibujarRedSenderos();
+
+        if (grupos.length === 1) {
+            alert('✅ ¡Toda la red está conectada! Un solo grupo de ' + grupos[0].length + ' nodos.');
+        } else {
+            const totalDesconectados = nodosDesconectadosActuales.size;
+            alert(
+                '⚠️ Se encontraron ' + grupos.length + ' grupos separados.\n' +
+                'Grupo principal: ' + grupos[0].length + ' nodos.\n' +
+                totalDesconectados + ' nodos quedaron resaltados en ROJO sobre el mapa — ' +
+                'conéctalos al resto haciendo clic en un nodo rojo y luego en uno azul cercano.'
+            );
+        }
+    });
 
     // AÑADIDO PARA RED DE SENDEROS: redibuja todos los nodos y aristas
     // actuales sobre el mapa (se llama tras cada cambio en la red)
@@ -1530,7 +1608,7 @@
 
         redSenderos.nodos.forEach(function(nodo) {
             const marcador = L.marker([nodo.lat, nodo.lng], {
-                icon: iconoNodoSendero(nodoSeleccionadoParaArista === nodo.id)
+                icon: iconoNodoSendero(nodoSeleccionadoParaArista === nodo.id, nodosDesconectadosActuales.has(nodo.id))
             }).addTo(capaEditorSenderos);
 
             marcador.on('click', function(e) {
@@ -1543,6 +1621,7 @@
                 } else {
                     redSenderos.aristas.push([nodoSeleccionadoParaArista, nodo.id]);
                     nodoSeleccionadoParaArista = null;
+                    nodosDesconectadosActuales = new Set(); // AÑADIDO PARA RED DE SENDEROS: limpiar resaltado tras conectar
                 }
                 redibujarRedSenderos();
                 actualizarContadorEditor();
