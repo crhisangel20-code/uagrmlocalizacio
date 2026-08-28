@@ -1192,9 +1192,9 @@
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
         markers[id].openPopup();
-        if (window.routingControl) {
-            map.removeControl(window.routingControl);
-            window.routingControl = null;
+        if (window.capaRutaPeatonal) { // AÑADIDO PARA RED DE SENDEROS: reemplaza la limpieza de L.Routing.control
+            map.removeLayer(window.capaRutaPeatonal);
+            window.capaRutaPeatonal = null;
         }
         document.getElementById('googleMapsLink').classList.add('hidden');
         document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Escribe tu origen o usa GPS.';
@@ -1267,9 +1267,9 @@
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
 
-        if (window.routingControl) {
-            map.removeControl(window.routingControl);
-            window.routingControl = null;
+        if (window.capaRutaPeatonal) { // AÑADIDO PARA RED DE SENDEROS: reemplaza la limpieza de L.Routing.control
+            map.removeLayer(window.capaRutaPeatonal);
+            window.capaRutaPeatonal = null;
         }
         if (window.originMarker) {
             map.removeLayer(window.originMarker);
@@ -1318,45 +1318,39 @@
                 ? `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (red de senderos propia). Sigue la línea verde.`
                 : `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (OpenRouteService). Sigue la línea verde.`;
 
-            window.routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(originLatLng.lat, originLatLng.lng),
-                    L.latLng(destino.lat, destino.lng)
-                ],
-                routeWhileDragging: true,
-                show: false, // AÑADIDO PARA OPENROUTESERVICE: se desactiva el panel por defecto de LRM (no entiende el formato de ORS); usamos nuestro propio panel de instrucciones
-                showAlternatives: false,
-                lineOptions: {
-                    styles: [{ color: '#0B6E4F', weight: 5, opacity: 0.85 }]
-                },
-                router: routerElegido, // AÑADIDO PARA RED DE SENDEROS: router elegido según disponibilidad de la red propia
-                createMarker: function() { return null; }
-            }).addTo(map);
-
-            // AÑADIDO PARA OPENROUTESERVICE: cuando la ruta llega bien,
-            // mostramos las indicaciones paso a paso y el botón para
-            // iniciar la navegación en vivo.
-            window.routingControl.on('routesfound', function(e) {
-                const ruta = e.routes && e.routes[0];
-                mostrarInstruccionesPeatonales(ruta ? ruta.pasos : []);
-                btnIniciarRutaPie.classList.remove('hidden');
-            });
-
-            // AÑADIDO PARA OPENROUTESERVICE: si el proxy o ORS fallan
-            // (por ejemplo, un problema de CORS o de conexión), se lo
-            // avisamos al usuario en vez de dejar la línea verde ausente
-            // sin ninguna explicación.
-            window.routingControl.on('routingerror', function(e) {
-                console.error('Error de enrutamiento peatonal:', e.error);
-                statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta peatonal (revisa el proxy de OpenRouteService). Intenta de nuevo.';
-                btnIniciarRutaPie.classList.add('hidden');
-                panelInstrucciones.classList.add('hidden');
-            });
-
             window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
                 .addTo(map).bindPopup('📍 Origen').openPopup();
             window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
                 .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+
+            // AÑADIDO PARA RED DE SENDEROS: en vez de usar L.Routing.control
+            // (cuyo código interno de dibujo del panel de instrucciones no
+            // soporta bien nuestro formato de ruta personalizado y lanza
+            // 'Cannot read properties of undefined'), llamamos al router
+            // directamente y dibujamos la línea nosotros mismos con
+            // L.polyline — mucho más simple y sin ese bug.
+            const waypointsRuta = [
+                { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
+                { latLng: L.latLng(destino.lat, destino.lng) }
+            ];
+
+            routerElegido.route(waypointsRuta, function(error, rutas) {
+                if (error || !rutas || !rutas.length) {
+                    console.error('Error de enrutamiento peatonal:', error);
+                    statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta peatonal. Intenta de nuevo.';
+                    btnIniciarRutaPie.classList.add('hidden');
+                    panelInstrucciones.classList.add('hidden');
+                    return;
+                }
+                const ruta = rutas[0];
+                window.capaRutaPeatonal = L.polyline(ruta.coordinates, {
+                    color: '#0B6E4F', weight: 5, opacity: 0.85
+                }).addTo(map);
+                map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50] });
+
+                mostrarInstruccionesPeatonales(ruta.pasos || []);
+                btnIniciarRutaPie.classList.remove('hidden');
+            }, null);
 
             // AÑADIDO PARA GA4: evento de ruta calculada (modo peatonal Leaflet Routing, ≤ 1 km)
             enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
