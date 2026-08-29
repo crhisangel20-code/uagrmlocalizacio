@@ -18,8 +18,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <!-- Leaflet Control Geocoder CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
     <!-- Tipografías: Fraunces (identidad / herencia colonial) + Inter (utilitaria) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -290,6 +288,22 @@
         .info-panel .btn-google:hover { background: #2f6693; }
         .info-panel .btn-google.hidden { display: none; }
 
+        /* AÑADIDO: cuando la ruta ya se calculó, el panel muestra SOLO el
+           botón "Iniciar ruta a pie", grande, centrado y arriba — sin el
+           texto de estado al lado, para que sea un elemento único y claro. */
+        .info-panel.solo-boton {
+            justify-content: center;
+        }
+        .info-panel.solo-boton .message {
+            display: none;
+        }
+        .info-panel.solo-boton .btn-google {
+            width: 100%;
+            justify-content: center;
+            padding: 14px 20px;
+            font-size: 1rem;
+        }
+
         /* AÑADIDO PARA OPENROUTESERVICE: panel de indicaciones paso a paso */
         .instrucciones-panel {
             margin-top: 16px;
@@ -316,11 +330,144 @@
             line-height: 1.4;
         }
         .instrucciones-panel.hidden { display: none; }
+        .resumen-ruta {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--tierra);
+            margin-bottom: 10px;
+        }
+        .resumen-ruta.hidden { display: none; }
+
+        /* AÑADIDO: modal de llegada profesional (reemplaza el alert() nativo) */
+        .modal-llegada-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            background: rgba(10, 30, 20, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeInOverlay 0.25s ease;
+        }
+        .modal-llegada-overlay.hidden { display: none; }
+        @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-llegada {
+            background: #ffffff;
+            border-radius: 20px;
+            max-width: 380px;
+            width: 100%;
+            padding: 30px 26px 26px;
+            text-align: center;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+            position: relative;
+            border-top: 6px solid var(--oro-escudo);
+            animation: popInModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes popInModal {
+            from { transform: scale(0.85) translateY(10px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .modal-llegada-icono {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--verde-suave);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 14px;
+            box-shadow: 0 0 0 6px rgba(11,110,79,0.08);
+        }
+        .modal-llegada h2 {
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            color: var(--verde-oscuro);
+            margin-bottom: 4px;
+        }
+        .modal-llegada .modal-destino {
+            font-weight: 600;
+            color: var(--tierra);
+            font-size: 0.95rem;
+            margin-bottom: 18px;
+        }
+        .modal-llegada-datos {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+        .modal-llegada-dato {
+            background: var(--verde-suave);
+            border-radius: 12px;
+            padding: 10px 16px;
+            min-width: 84px;
+        }
+        .modal-llegada-dato .valor {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: var(--verde-oscuro);
+            display: block;
+        }
+        .modal-llegada-dato .etiqueta {
+            font-size: 0.68rem;
+            color: var(--tierra);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .btn-cerrar-modal {
+            border: none;
+            background: var(--verde-bandera);
+            color: #fff;
+            font-family: var(--font-body);
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.92rem;
+            transition: 0.2s;
+        }
+        .btn-cerrar-modal:hover { background: var(--verde-oscuro); }
+
+        /* AÑADIDO: toast no intrusivo para el aviso de "estás cerca" (reemplaza el alert() nativo) */
+        .toast-cerca {
+            position: fixed;
+            left: 50%;
+            bottom: 26px;
+            transform: translateX(-50%) translateY(20px);
+            z-index: 10001;
+            background: var(--verde-oscuro);
+            color: var(--marfil);
+            padding: 14px 20px;
+            border-radius: 14px;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 90vw;
+            width: 360px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            border-left: 5px solid var(--oro-escudo);
+        }
+        .toast-cerca.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+        .toast-cerca .toast-icono { font-size: 1.3rem; flex-shrink: 0; }
+        .toast-cerca .toast-texto { font-size: 0.86rem; line-height: 1.4; }
 
         /* AÑADIDO PARA RED DE SENDEROS: editor visual de senderos */
         .editor-senderos {
             margin-top: 16px;
         }
+        .editor-senderos.hidden { display: none; } /* AÑADIDO: oculto salvo con ?editor=true en la URL */
         .btn-editor-toggle {
             width: 100%;
             border: 1.5px dashed rgba(140,90,52,0.4);
@@ -649,8 +796,7 @@
             <select id="targetid">
                 <option value="">-- Selecciona un edificio --</option>
             </select>
-            <input type="text" id="originInput" placeholder="Origen (ej. Warnes, La Guardia, Av. San Martín)" />
-            <button class="btn-calcular" id="btnCalcularRuta">➡️ Calcular ruta</button>
+            <!-- AÑADIDO: se quitó el cuadro de origen manual y "Calcular ruta" — ya no se usa Google Maps, solo GPS -->
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
         </div>
 
@@ -659,7 +805,7 @@
         <div id="mapid"></div>
 
         <div class="info-panel" id="infoPanel">
-            <span class="message" id="statusMessage">🌍 Selecciona un edificio y luego escribe tu origen o usa GPS.</span>
+            <span class="message" id="statusMessage">🌍 Selecciona un edificio y luego usa tu ubicación (GPS).</span>
             <!-- AÑADIDO: se quitó el botón de Google Maps — ahora toda ruta se calcula y dibuja dentro del propio mapa -->
             <!-- AÑADIDO PARA OPENROUTESERVICE: botón para iniciar navegación peatonal en vivo -->
             <button class="btn-google hidden" id="btnIniciarRutaPie" style="background: var(--verde-bandera);">
@@ -670,6 +816,7 @@
         <!-- AÑADIDO PARA OPENROUTESERVICE: panel de indicaciones paso a paso -->
         <div class="instrucciones-panel hidden" id="instruccionesPanel">
             <h3>🚶 Indicaciones paso a paso</h3>
+            <p class="resumen-ruta hidden" id="resumenRuta"></p>
             <ol id="listaInstrucciones"></ol>
         </div>
 
@@ -679,7 +826,7 @@
         </div>
 
         <!-- AÑADIDO PARA RED DE SENDEROS: editor visual de senderos peatonales -->
-        <div class="editor-senderos" id="editorSenderos">
+        <div class="editor-senderos hidden" id="editorSenderos">
             <button class="btn-editor-toggle" id="btnToggleEditor">🛠️ Editor de senderos peatonales</button>
             <div class="editor-senderos-panel hidden" id="editorSenderosPanel">
                 <p class="editor-instrucciones">
@@ -706,10 +853,39 @@
     </main>
 </div>
 
+<!-- AÑADIDO: modal de llegada profesional (reemplaza el alert() nativo) -->
+<div class="modal-llegada-overlay hidden" id="modalLlegadaOverlay">
+    <div class="modal-llegada">
+        <div class="modal-llegada-icono">🎉</div>
+        <h2>¡Has llegado!</h2>
+        <div class="modal-destino" id="modalLlegadaDestino"></div>
+        <div class="modal-llegada-datos">
+            <div class="modal-llegada-dato">
+                <span class="valor" id="modalLlegadaDistancia">-</span>
+                <span class="etiqueta">Recorrido</span>
+            </div>
+            <div class="modal-llegada-dato">
+                <span class="valor" id="modalLlegadaTiempo">-</span>
+                <span class="etiqueta">Tiempo</span>
+            </div>
+            <div class="modal-llegada-dato">
+                <span class="valor" id="modalLlegadaPrecision">-</span>
+                <span class="etiqueta">Precisión GPS</span>
+            </div>
+        </div>
+        <button class="btn-cerrar-modal" id="btnCerrarModalLlegada">Entendido</button>
+    </div>
+</div>
+
+<!-- AÑADIDO: toast de aviso "estás cerca del destino" (reemplaza el alert() nativo) -->
+<div class="toast-cerca" id="toastCerca">
+    <span class="toast-icono">🔔</span>
+    <span class="toast-texto" id="toastCercaTexto"></span>
+</div>
+
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-<script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
 
 <script>
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
@@ -953,25 +1129,45 @@
             });
             coordenadasRuta.push(L.latLng(destinoWp.lat, destinoWp.lng));
 
-            // Generar indicaciones simples: distancia de cada tramo y
-            // aviso de giro cuando el cambio de rumbo es notorio.
+            // AÑADIDO: se reescribió la generación de pasos para agrupar
+            // tramos rectos consecutivos en una sola indicación (antes
+            // cada segmento entre nodos generaba su propio "Continúa
+            // recto", resultando en listas de 14+ pasos confusas para
+            // trayectos cortos). Ahora solo se crea un paso nuevo cuando
+            // hay un giro real; el resto se acumula como una distancia.
             const pasos = [];
+            let distanciaAcumulada = 0;
+            let instruccionTramoActual = 'Continúa recto';
+
             for (let i = 0; i < coordenadasRuta.length - 1; i++) {
                 const a = coordenadasRuta[i];
                 const b = coordenadasRuta[i + 1];
                 const distTramo = distancia(a.lat, a.lng, b.lat, b.lng) * 1000;
-                let textoInstruccion = 'Continúa recto';
+
+                let esGiro = false;
+                let textoGiro = '';
                 if (i > 0) {
                     const rumboAnterior = calcularRumbo(coordenadasRuta[i - 1].lat, coordenadasRuta[i - 1].lng, a.lat, a.lng);
                     const rumboActual = calcularRumbo(a.lat, a.lng, b.lat, b.lng);
                     let diff = rumboActual - rumboAnterior;
                     diff = ((diff + 180) % 360 + 360) % 360 - 180; // normalizar a [-180, 180]
-                    if (diff > 30) textoInstruccion = 'Gira a la derecha';
-                    else if (diff < -30) textoInstruccion = 'Gira a la izquierda';
+                    if (diff > 30) { esGiro = true; textoGiro = 'Gira a la derecha'; }
+                    else if (diff < -30) { esGiro = true; textoGiro = 'Gira a la izquierda'; }
                 }
-                if (distTramo >= 1) {
-                    pasos.push({ instruccion: textoInstruccion, distanciaMetros: Math.round(distTramo) });
+
+                if (esGiro) {
+                    // Cierra el tramo recto anterior como un solo paso
+                    if (distanciaAcumulada >= 1) {
+                        pasos.push({ instruccion: instruccionTramoActual, distanciaMetros: Math.round(distanciaAcumulada) });
+                    }
+                    distanciaAcumulada = 0;
+                    instruccionTramoActual = textoGiro; // el siguiente tramo empieza con este giro
                 }
+
+                distanciaAcumulada += distTramo;
+            }
+            if (distanciaAcumulada >= 1) {
+                pasos.push({ instruccion: instruccionTramoActual, distanciaMetros: Math.round(distanciaAcumulada) });
             }
             pasos.push({ instruccion: 'Has llegado a tu destino', distanciaMetros: 0 });
 
@@ -1194,7 +1390,8 @@
             map.removeLayer(window.capaRutaPeatonal);
             window.capaRutaPeatonal = null;
         }
-        document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Escribe tu origen o usa GPS.';
+        document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: volver a mostrar el texto de estado
+        document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Usa tu ubicación (GPS) para calcular la ruta.';
         if (userLocation) {
             planificarRuta(userLocation, edificios.find(e => e.id === id));
         }
@@ -1216,11 +1413,23 @@
 
     // AÑADIDO PARA OPENROUTESERVICE: pinta la lista de indicaciones paso a paso
     // usando el texto que ya viene listo desde OpenRouteService.
-    function mostrarInstruccionesPeatonales(pasos) {
+    // AÑADIDO: ahora recibe también un resumen (distancia/tiempo) para
+    // mostrarlo arriba de la lista y que sea más fácil de entender de un vistazo.
+    function mostrarInstruccionesPeatonales(pasos, resumen) {
         listaInstrucciones.innerHTML = '';
+        const resumenEl = document.getElementById('resumenRuta'); // AÑADIDO
         if (!pasos || !pasos.length) {
             panelInstrucciones.classList.add('hidden');
             return;
+        }
+        if (resumenEl) { // AÑADIDO
+            if (resumen && resumen.totalDistance) {
+                const minutos = Math.max(1, Math.round((resumen.totalTime || 0) / 60));
+                resumenEl.textContent = `📏 ${Math.round(resumen.totalDistance)} m · ⏱️ ~${minutos} min caminando`;
+                resumenEl.classList.remove('hidden');
+            } else {
+                resumenEl.classList.add('hidden');
+            }
         }
         pasos.forEach(function(paso) {
             const li = document.createElement('li');
@@ -1238,6 +1447,43 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    // AÑADIDO: utilidades para medir la distancia SIGUIENDO el trazado
+    // real de la ruta (red de senderos propia u OpenRouteService) en vez
+    // de la línea recta al destino. Esto hace que la detección de "cerca"
+    // y "llegada" sea fiel al camino que el usuario realmente camina, en
+    // vez de una línea imaginaria que puede atravesar edificios u otras
+    // zonas no transitables.
+    const LAT_REFERENCIA_PROYECCION = -17.78;
+    function proyectarEnSegmento(lat, lng, a, b) {
+        const cosLat = Math.cos(LAT_REFERENCIA_PROYECCION * Math.PI / 180);
+        const p = { x: lng * cosLat, y: lat };
+        const pa = { x: a.lng * cosLat, y: a.lat };
+        const pb = { x: b.lng * cosLat, y: b.lat };
+        const dx = pb.x - pa.x, dy = pb.y - pa.y;
+        const largoCuadrado = dx * dx + dy * dy;
+        let t = largoCuadrado === 0 ? 0 : ((p.x - pa.x) * dx + (p.y - pa.y) * dy) / largoCuadrado;
+        t = Math.max(0, Math.min(1, t));
+        return { lat: pa.y + t * dy, lng: (pa.x + t * dx) / cosLat };
+    }
+
+    function distanciaRestanteEnRuta(coordsRuta, lat, lng) {
+        if (!coordsRuta || coordsRuta.length < 2) return null;
+        let mejorDist = Infinity, mejorIdx = 0, mejorPunto = null;
+        for (let i = 0; i < coordsRuta.length - 1; i++) {
+            const a = coordsRuta[i], b = coordsRuta[i + 1];
+            const proy = proyectarEnSegmento(lat, lng, a, b);
+            const d = distancia(lat, lng, proy.lat, proy.lng) * 1000;
+            if (d < mejorDist) { mejorDist = d; mejorIdx = i; mejorPunto = proy; }
+        }
+        // distancia restante = del punto más cercano sobre la ruta hasta
+        // el final del tramo actual, más todos los tramos siguientes
+        let restante = distancia(mejorPunto.lat, mejorPunto.lng, coordsRuta[mejorIdx + 1].lat, coordsRuta[mejorIdx + 1].lng) * 1000;
+        for (let i = mejorIdx + 1; i < coordsRuta.length - 1; i++) {
+            restante += distancia(coordsRuta[i].lat, coordsRuta[i].lng, coordsRuta[i + 1].lat, coordsRuta[i + 1].lng) * 1000;
+        }
+        return { distanciaRestanteMetros: restante, distanciaAlSenderoMetros: mejorDist };
+    }
+
     function iconoOrigenDestino(tipo) {
         const color = tipo === 'origen' ? '#3E7CB1' : '#D9A441';
         const emoji = tipo === 'origen' ? '📍' : '🏁';
@@ -1248,6 +1494,43 @@
             iconAnchor: [14, 26],
             popupAnchor: [0, -26]
         });
+    }
+
+    // AÑADIDO: modal profesional de llegada (reemplaza el alert() nativo)
+    const modalLlegadaOverlay = document.getElementById('modalLlegadaOverlay');
+    document.getElementById('btnCerrarModalLlegada').addEventListener('click', function() {
+        modalLlegadaOverlay.classList.add('hidden');
+    });
+
+    function formatearTiempoTranscurrido(segundos) {
+        const min = Math.floor(segundos / 60);
+        const seg = Math.round(segundos % 60);
+        return min > 0 ? `${min}m ${seg}s` : `${seg}s`;
+    }
+
+    function mostrarModalLlegada(destino, distanciaTotalMetros, precisionGPS) {
+        document.getElementById('modalLlegadaDestino').textContent = destino.nombre.replace(/^↪\s*/, '');
+        document.getElementById('modalLlegadaDistancia').textContent = distanciaTotalMetros ? `${Math.round(distanciaTotalMetros)} m` : '—';
+        const segundosTranscurridos = window.tiempoInicioRuta ? (Date.now() - window.tiempoInicioRuta) / 1000 : null;
+        document.getElementById('modalLlegadaTiempo').textContent = segundosTranscurridos != null ? formatearTiempoTranscurrido(segundosTranscurridos) : '—';
+        document.getElementById('modalLlegadaPrecision').textContent = `±${Math.round(precisionGPS)} m`;
+        modalLlegadaOverlay.classList.remove('hidden');
+
+        enviarEventoGA4('llegada_destino', {
+            event_category: 'Mapa UAGRM',
+            event_label: destino.nombre,
+            precision_gps_m: Math.round(precisionGPS)
+        });
+    }
+
+    // AÑADIDO: toast no intrusivo para el aviso "estás cerca" (reemplaza el alert() nativo)
+    let toastCercaTimeoutId = null;
+    function mostrarToastCerca(mensaje) {
+        const toast = document.getElementById('toastCerca');
+        document.getElementById('toastCercaTexto').textContent = mensaje;
+        toast.classList.add('visible');
+        if (toastCercaTimeoutId) clearTimeout(toastCercaTimeoutId);
+        toastCercaTimeoutId = setTimeout(() => toast.classList.remove('visible'), 5000);
     }
 
     function planificarRuta(originLatLng, destino) {
@@ -1263,6 +1546,13 @@
         modoNavegacionActivo = false;
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
+        document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: mostrar el texto de estado de nuevo mientras calcula
+
+        // AÑADIDO: se reinicia el trazado guardado de la ruta actual y la
+        // distancia total, para que el seguimiento por sendero use
+        // siempre los datos de la ruta recién calculada.
+        window.rutaCoordsActuales = null;
+        window.distanciaTotalRutaMetros = null;
 
         if (window.capaRutaPeatonal) {
             map.removeLayer(window.capaRutaPeatonal);
@@ -1300,6 +1590,7 @@
             if (error || !rutas || !rutas.length) {
                 console.error('Error de enrutamiento:', error);
                 statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta. Intenta de nuevo.';
+                document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: mostrar el mensaje de error
                 btnIniciarRutaPie.classList.add('hidden');
                 panelInstrucciones.classList.add('hidden');
                 return;
@@ -1310,8 +1601,17 @@
             }).addTo(map);
             map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50] });
 
-            statusMsg.innerHTML = '🚶 Ruta calculada. Sigue la línea lila.';
-            mostrarInstruccionesPeatonales(ruta.pasos || []);
+            // AÑADIDO: se guarda el trazado real de la ruta (coordenadas
+            // que siguen los senderos/calles caminables) y su distancia
+            // total, para que el seguimiento en vivo mida el avance sobre
+            // ese trazado en vez de la línea recta al destino.
+            window.rutaCoordsActuales = ruta.coordinates;
+            window.distanciaTotalRutaMetros = ruta.summary && ruta.summary.totalDistance;
+
+            // AÑADIDO: al lograrse la ruta, se oculta el texto y queda
+            // SOLO el botón "Iniciar ruta a pie", grande y arriba.
+            document.getElementById('infoPanel').classList.add('solo-boton');
+            mostrarInstruccionesPeatonales(ruta.pasos || [], ruta.summary);
             btnIniciarRutaPie.classList.remove('hidden');
         }, null);
 
@@ -1324,7 +1624,9 @@
         });
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
-        window.alertaMostrada = false;
+        window.alertaCercaMostrada = false; // AÑADIDO: renombrado y separado de la alerta de llegada
+        window.alertaLlegadaMostrada = false; // AÑADIDO: nueva alerta específica de "ya llegaste"
+        window.tiempoInicioRuta = Date.now(); // AÑADIDO: marca de tiempo para calcular la duración del recorrido en el modal de llegada
         watchId = navigator.geolocation.watchPosition(
             function(pos) {
                 const userLat = pos.coords.latitude;
@@ -1340,15 +1642,46 @@
                     map.setView([userLat, userLng], 19, { animate: true });
                 }
 
-                const d = distancia(userLat, userLng, destino.lat, destino.lng);
-                if (d <= 0.1) {
-                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea lila para llegar a tu destino.';
-                    if (!window.alertaMostrada) {
-                        alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea lila en el mapa.');
-                        window.alertaMostrada = true;
+                const distLineaRecta = distancia(userLat, userLng, destino.lat, destino.lng) * 1000;
+
+                // AÑADIDO: si existe una ruta trazada (red de senderos u
+                // OpenRouteService), la distancia restante se mide
+                // SIGUIENDO ese trazado real caminable, en vez de en línea
+                // recta. Así el aviso de "cerca" y la detección de
+                // "llegada" son fieles al camino que el usuario realmente
+                // recorre — por ejemplo, si el sendero rodea un edificio,
+                // la app no avisa "llegaste" mientras aún falta rodear.
+                const infoRuta = distanciaRestanteEnRuta(window.rutaCoordsActuales, userLat, userLng);
+                const dMetros = infoRuta ? infoRuta.distanciaRestanteMetros : distLineaRecta;
+
+                // AÑADIDO: detección de llegada basada en la precisión REAL
+                // que el propio GPS del dispositivo reporta en cada lectura
+                // (pos.coords.accuracy, en metros). Un GPS de celular nunca
+                // es exacto a 0 m — su margen de error típico es de 5 a 20 m
+                // al aire libre. En vez de un número fijo inventado, usamos
+                // el margen de error real de ESE dispositivo en ESE momento,
+                // acotado entre 8 y 25 m para evitar falsos positivos si el
+                // GPS reporta una precisión muy mala (ej. bajo techo).
+                const precisionGPS = pos.coords.accuracy || 15;
+                const radioLlegada = Math.min(Math.max(precisionGPS, 8), 25);
+
+                if (dMetros <= radioLlegada) {
+                    statusMsg.innerHTML = `🎉 ¡Has llegado a tu destino: ${destino.nombre}! (±${Math.round(precisionGPS)} m de precisión GPS)`;
+                    if (!window.alertaLlegadaMostrada) {
+                        mostrarModalLlegada(destino, window.distanciaTotalRutaMetros, precisionGPS);
+                        window.alertaLlegadaMostrada = true;
                     }
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
+                } else if (dMetros <= 100) {
+                    // AÑADIDO: este aviso ahora NO detiene el GPS — sigue
+                    // rastreando hasta detectar la llegada real, y usa la
+                    // distancia restante sobre el sendero real (no línea recta).
+                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m siguiendo la ruta). Sigue la línea lila para llegar a tu destino.';
+                    if (!window.alertaCercaMostrada) {
+                        mostrarToastCerca(`Estás a unos ${Math.round(dMetros)} m de tu destino. Sigue la línea lila en el mapa.`);
+                        window.alertaCercaMostrada = true;
+                    }
                 }
             },
             function(err) { console.warn('Error en watchPosition:', err); },
@@ -1406,46 +1739,8 @@
         );
     });
 
-    // -------------------------------------------------------------
-    // 6. BÚSQUEDA DE ORIGEN MANUAL (Geocoder)
-    // -------------------------------------------------------------
-    const geocoder = L.Control.Geocoder.nominatim();
-    const originInput = document.getElementById('originInput');
-
-    function calcularRutaDesdeOrigen() {
-        const query = originInput.value.trim();
-        if (!query) {
-            alert('Escribe un origen válido (ej. La Guardia, Warnes, Av. San Martín).');
-            return;
-        }
-        if (!selectedBuildingId) {
-            alert('Primero selecciona un edificio destino.');
-            return;
-        }
-        geocoder.geocode(query, function(results) {
-            if (results.length === 0) {
-                alert('No se encontró esa dirección. Intenta con otro nombre.');
-                return;
-            }
-            const first = results[0];
-            const lat = first.center.lat;
-            const lng = first.center.lng;
-            userLocation = { lat, lng };
-            const destino = edificios.find(e => e.id === selectedBuildingId);
-            if (destino) {
-                map.setView([lat, lng], 15, { animate: true });
-                planificarRuta(userLocation, destino);
-                if (window.originMarker) map.removeLayer(window.originMarker);
-                window.originMarker = L.marker([lat, lng], { icon: iconoOrigenDestino('origen') })
-                    .addTo(map).bindPopup('📍 Origen: ' + query).openPopup();
-            }
-        });
-    }
-
-    document.getElementById('btnCalcularRuta').addEventListener('click', calcularRutaDesdeOrigen);
-    originInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') calcularRutaDesdeOrigen();
-    });
+    // AÑADIDO: se quitó la sección 6 (búsqueda de origen manual por geocoder)
+    // ya que el flujo ahora solo usa GPS como origen.
 
     // -------------------------------------------------------------
     // 7. PANTALLA DE BIENVENIDA
@@ -1464,6 +1759,14 @@
     // 8. AJUSTE INICIAL
     // -------------------------------------------------------------
     setTimeout(() => map.invalidateSize(), 400);
+
+    // AÑADIDO: el editor de senderos solo se revela si la URL trae
+    // exactamente ?editor=true al final (ej. .../uagrmlocalizacio/?editor=true).
+    // Para cualquier visitante normal, esta sección de administración
+    // queda completamente oculta y no aparece en el HTML visible.
+    if (new URLSearchParams(window.location.search).get('editor') === 'true') {
+        document.getElementById('editorSenderos').classList.remove('hidden');
+    }
 
     // ===============================================================
     // AÑADIDO PARA RED DE SENDEROS: editor visual + carga automática
