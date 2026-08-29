@@ -660,9 +660,7 @@
 
         <div class="info-panel" id="infoPanel">
             <span class="message" id="statusMessage">🌍 Selecciona un edificio y luego escribe tu origen o usa GPS.</span>
-            <a href="#" id="googleMapsLink" class="btn-google hidden" target="_blank">
-                🚗 Abrir en Google Maps
-            </a>
+            <!-- AÑADIDO: se quitó el botón de Google Maps — ahora toda ruta se calcula y dibuja dentro del propio mapa -->
             <!-- AÑADIDO PARA OPENROUTESERVICE: botón para iniciar navegación peatonal en vivo -->
             <button class="btn-google hidden" id="btnIniciarRutaPie" style="background: var(--verde-bandera);">
                 🚶 Iniciar ruta a pie
@@ -676,7 +674,7 @@
         </div>
 
         <div class="footer-note">
-            🧭 Si estás lejos (&gt; 1 km) te sugerimos Google Maps. Al acercarte (&lt; 1 km) activamos navegación peatonal dentro del mapa.
+            🧭 El mapa calcula y dibuja tu ruta directamente sobre el plano del campus, sin importar la distancia.
             Al estar a 100 m del destino, recibirás una alerta visual.
         </div>
 
@@ -1196,7 +1194,6 @@
             map.removeLayer(window.capaRutaPeatonal);
             window.capaRutaPeatonal = null;
         }
-        document.getElementById('googleMapsLink').classList.add('hidden');
         document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Escribe tu origen o usa GPS.';
         if (userLocation) {
             planificarRuta(userLocation, edificios.find(e => e.id === id));
@@ -1207,7 +1204,7 @@
     // -------------------------------------------------------------
     // 5. GEOLOCALIZACIÓN Y LÓGICA DE RUTA
     const statusMsg = document.getElementById('statusMessage');
-    const googleBtn = document.getElementById('googleMapsLink');
+    const COLOR_RUTA = '#A64CD9'; // AÑADIDO: color lila para la línea de ruta (antes era verde)
 
     let userLocation = null;
     let destinoActual = null;
@@ -1267,7 +1264,7 @@
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
 
-        if (window.capaRutaPeatonal) { // AÑADIDO PARA RED DE SENDEROS: reemplaza la limpieza de L.Routing.control
+        if (window.capaRutaPeatonal) {
             map.removeLayer(window.capaRutaPeatonal);
             window.capaRutaPeatonal = null;
         }
@@ -1280,118 +1277,83 @@
             window.destMarker = null;
         }
 
-        if (dist > 1) {
-            const url = `https://www.google.com/maps/dir/?api=1&origin=${originLatLng.lat},${originLatLng.lng}&destination=${destino.lat},${destino.lng}&travelmode=driving`;
-            googleBtn.href = url;
-            googleBtn.classList.remove('hidden');
-            statusMsg.innerHTML = `🚗 Estás a ${dist.toFixed(2)} km de tu destino. Te sugerimos usar Google Maps para llegar en auto/moto.`;
-            window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
-                .addTo(map).bindPopup('📍 Origen').openPopup();
-            window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
-                .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
-            const bounds = L.latLngBounds([originLatLng.lat, originLatLng.lng], [destino.lat, destino.lng]);
-            map.fitBounds(bounds, { padding: [50, 50] });
+        // AÑADIDO: ya no se redirige a Google Maps sin importar la distancia —
+        // toda ruta se calcula y se dibuja siempre dentro del propio mapa.
+        const usandoRedPropia = redSenderos.nodos.length > 0;
+        const routerElegido = usandoRedPropia
+            ? new L.Routing.RedSenderosRouter()
+            : new L.Routing.ORSRouter({ proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/' });
 
-            // AÑADIDO PARA OPENROUTESERVICE: no aplica navegación peatonal en este caso
-            btnIniciarRutaPie.classList.add('hidden');
-            panelInstrucciones.classList.add('hidden');
+        statusMsg.innerHTML = `🚶 Calculando ruta (${dist.toFixed(2)} km en línea recta)...`;
 
-            // AÑADIDO PARA GA4: evento de ruta calculada (modo Google Maps, > 1 km)
-            enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
-                event_category: 'Mapa UAGRM',
-                event_label: destino.nombre,
-                metodo_ruta: 'google_maps',
-                distancia_km: Number(dist.toFixed(2))
-            });
-        } else {
-            googleBtn.classList.add('hidden');
+        window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
+            .addTo(map).bindPopup('📍 Origen').openPopup();
+        window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
+            .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
 
-            // AÑADIDO PARA RED DE SENDEROS: usa la red dibujada a mano si
-            // ya tiene nodos cargados; si no, cae de vuelta a ORS como
-            // respaldo automático (no rompe lo que ya funcionaba).
-            const usandoRedPropia = redSenderos.nodos.length > 0;
-            const routerElegido = usandoRedPropia
-                ? new L.Routing.RedSenderosRouter()
-                : new L.Routing.ORSRouter({ proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/' });
+        const waypointsRuta = [
+            { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
+            { latLng: L.latLng(destino.lat, destino.lng) }
+        ];
 
-            statusMsg.innerHTML = usandoRedPropia
-                ? `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (red de senderos propia). Sigue la línea verde.`
-                : `🚶 Estás a ${(dist*1000).toFixed(0)} m. Activando navegación peatonal (OpenRouteService). Sigue la línea verde.`;
+        routerElegido.route(waypointsRuta, function(error, rutas) {
+            if (error || !rutas || !rutas.length) {
+                console.error('Error de enrutamiento:', error);
+                statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta. Intenta de nuevo.';
+                btnIniciarRutaPie.classList.add('hidden');
+                panelInstrucciones.classList.add('hidden');
+                return;
+            }
+            const ruta = rutas[0];
+            window.capaRutaPeatonal = L.polyline(ruta.coordinates, {
+                color: COLOR_RUTA, weight: 5, opacity: 0.85 // AÑADIDO: línea lila en vez de verde
+            }).addTo(map);
+            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50] });
 
-            window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
-                .addTo(map).bindPopup('📍 Origen').openPopup();
-            window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
-                .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+            statusMsg.innerHTML = '🚶 Ruta calculada. Sigue la línea lila.';
+            mostrarInstruccionesPeatonales(ruta.pasos || []);
+            btnIniciarRutaPie.classList.remove('hidden');
+        }, null);
 
-            // AÑADIDO PARA RED DE SENDEROS: en vez de usar L.Routing.control
-            // (cuyo código interno de dibujo del panel de instrucciones no
-            // soporta bien nuestro formato de ruta personalizado y lanza
-            // 'Cannot read properties of undefined'), llamamos al router
-            // directamente y dibujamos la línea nosotros mismos con
-            // L.polyline — mucho más simple y sin ese bug.
-            const waypointsRuta = [
-                { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
-                { latLng: L.latLng(destino.lat, destino.lng) }
-            ];
+        // AÑADIDO PARA GA4: evento de ruta calculada
+        enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
+            event_category: 'Mapa UAGRM',
+            event_label: destino.nombre,
+            metodo_ruta: usandoRedPropia ? 'red_senderos_propia' : 'openrouteservice_peatonal',
+            distancia_km: Number(dist.toFixed(3))
+        });
 
-            routerElegido.route(waypointsRuta, function(error, rutas) {
-                if (error || !rutas || !rutas.length) {
-                    console.error('Error de enrutamiento peatonal:', error);
-                    statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta peatonal. Intenta de nuevo.';
-                    btnIniciarRutaPie.classList.add('hidden');
-                    panelInstrucciones.classList.add('hidden');
-                    return;
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        window.alertaMostrada = false;
+        watchId = navigator.geolocation.watchPosition(
+            function(pos) {
+                const userLat = pos.coords.latitude;
+                const userLng = pos.coords.longitude;
+
+                // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
+                // "Iniciar ruta a pie", seguimos su posición en vivo
+                // recentrando el mapa y moviendo el marcador de origen.
+                if (modoNavegacionActivo) {
+                    if (window.originMarker) {
+                        window.originMarker.setLatLng([userLat, userLng]);
+                    }
+                    map.setView([userLat, userLng], 19, { animate: true });
                 }
-                const ruta = rutas[0];
-                window.capaRutaPeatonal = L.polyline(ruta.coordinates, {
-                    color: '#0B6E4F', weight: 5, opacity: 0.85
-                }).addTo(map);
-                map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50] });
 
-                mostrarInstruccionesPeatonales(ruta.pasos || []);
-                btnIniciarRutaPie.classList.remove('hidden');
-            }, null);
-
-            // AÑADIDO PARA GA4: evento de ruta calculada (modo peatonal Leaflet Routing, ≤ 1 km)
-            enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
-                event_category: 'Mapa UAGRM',
-                event_label: destino.nombre,
-                metodo_ruta: usandoRedPropia ? 'red_senderos_propia' : 'openrouteservice_peatonal',
-                distancia_km: Number(dist.toFixed(3))
-            });
-
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-            window.alertaMostrada = false;
-            watchId = navigator.geolocation.watchPosition(
-                function(pos) {
-                    const userLat = pos.coords.latitude;
-                    const userLng = pos.coords.longitude;
-
-                    // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
-                    // "Iniciar ruta a pie", seguimos su posición en vivo
-                    // recentrando el mapa y moviendo el marcador de origen.
-                    if (modoNavegacionActivo) {
-                        if (window.originMarker) {
-                            window.originMarker.setLatLng([userLat, userLng]);
-                        }
-                        map.setView([userLat, userLng], 19, { animate: true });
+                const d = distancia(userLat, userLng, destino.lat, destino.lng);
+                if (d <= 0.1) {
+                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea lila para llegar a tu destino.';
+                    if (!window.alertaMostrada) {
+                        alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea lila en el mapa.');
+                        window.alertaMostrada = true;
                     }
-
-                    const d = distancia(userLat, userLng, destino.lat, destino.lng);
-                    if (d <= 0.1) {
-                        statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m). Sigue la línea verde para llegar a tu destino.';
-                        if (!window.alertaMostrada) {
-                            alert('¡Estás a menos de 100 metros de tu destino! Sigue la línea verde en el mapa.');
-                            window.alertaMostrada = true;
-                        }
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                    }
-                },
-                function(err) { console.warn('Error en watchPosition:', err); },
-                { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-            );
-        }
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+            },
+            function(err) { console.warn('Error en watchPosition:', err); },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+        );
     }
 
     // AÑADIDO PARA OPENROUTESERVICE: al presionar "Iniciar ruta a pie" se
@@ -1400,7 +1362,7 @@
     // la navegación.
     btnIniciarRutaPie.addEventListener('click', function() {
         modoNavegacionActivo = true;
-        statusMsg.innerHTML = '🚶 Navegación iniciada. Sigue la línea verde y las indicaciones de abajo.';
+        statusMsg.innerHTML = '🚶 Navegación iniciada. Sigue la línea lila y las indicaciones de abajo.';
         this.classList.add('hidden');
         if (panelInstrucciones) {
             panelInstrucciones.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
