@@ -905,26 +905,63 @@
            RESPONSIVE GENERAL - AJUSTE A CUALQUIER DISPOSITIVO MÓVIL
            ========================================================= */
         @media (max-width: 480px) {
+            html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
             body { padding: 0; align-items: stretch; }
-            .container { border-radius: 0; border: none; }
+            .container { width: 100%; max-width: 100%; border-radius: 0; border: none; overflow: hidden; }
             header.hero { padding: 20px 16px; gap: 14px; }
             .emblema { width: 46px; height: 46px; }
             h1 { font-size: 1.25rem; }
             .subtitulo { font-size: 0.8rem; }
-            main { padding: 14px 12px 18px; }
-            .search-section { padding: 14px 14px; gap: 10px; }
-            .search-section select, .search-section input { min-width: 100%; font-size: 0.9rem; }
-            .btn-geo, .btn-calcular { width: 100%; text-align: center; padding: 9px 16px; font-size: 0.85rem; min-height: 44px; }
-            .btn-estadisticas { padding: 8px 14px; font-size: 0.78rem; white-space: normal; min-height: 44px; }
-            .btn-google, .btn-google-maps, .btn-cerrar-modal { padding: 8px 16px; font-size: 0.82rem; min-height: 44px; }
+            main { width: 100%; max-width: 100%; padding: 14px 12px 18px; overflow: hidden; }
+            .search-section {
+                width: 100%;
+                max-width: 100%;
+                padding: 14px;
+                gap: 10px;
+                overflow: hidden;
+            }
+            .search-section label { width: 100%; }
+            .search-section select,
+            .search-section input {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                font-size: 0.9rem;
+            }
+            .btn-geo, .btn-calcular, .btn-estadisticas {
+                width: 100%;
+                max-width: 100%;
+                margin-bottom: 8px;
+                text-align: center;
+                box-sizing: border-box;
+            }
+            .btn-geo, .btn-calcular { padding: 9px 16px; font-size: 0.85rem; min-height: 44px; }
+            .btn-estadisticas { padding: 8px 12px; font-size: 0.8rem; white-space: normal; min-height: 44px; }
+            .btn-google, .btn-google-maps, .btn-cerrar-modal {
+                max-width: 100%;
+                padding: 8px 16px;
+                font-size: 0.82rem;
+                min-height: 44px;
+                white-space: normal;
+            }
             .btn-ingresar { padding: 12px 24px; font-size: 0.9rem; min-height: 44px; }
             .btn-editor-toggle { padding: 8px 14px; font-size: 0.78rem; min-height: 44px; }
-            .leyenda { padding: 10px 12px; gap: 6px 12px; }
-            .leyenda-item { font-size: 0.72rem; }
-            #mapid { height: 62vh; min-height: 320px; border-radius: 14px; }
-            .info-panel { padding: 12px 14px; }
-            .info-panel .message { font-size: 0.86rem; }
-            .footer-note { font-size: 0.74rem; }
+            .leyenda { width: 100%; max-width: 100%; padding: 10px 12px; gap: 6px 12px; overflow: hidden; }
+            .leyenda-item { max-width: 100%; font-size: 0.75rem; }
+            #mapid { width: 100%; max-width: 100%; height: 62vh; min-height: 320px; border-radius: 14px; overflow: hidden; }
+            .info-panel {
+                width: 90%;
+                max-width: 90%;
+                margin-left: auto;
+                margin-right: auto;
+                padding: 12px;
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            .info-panel .message { min-width: 0; font-size: 0.86rem; overflow-wrap: anywhere; }
+            .info-panel .btn-google { max-width: 100%; }
+            .leaflet-tooltip { max-width: 90%; font-size: 0.75rem; }
+            .footer-note { font-size: 0.74rem; overflow-wrap: anywhere; }
         }
 
         @media (max-width: 380px) {
