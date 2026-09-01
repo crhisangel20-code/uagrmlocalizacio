@@ -1,0 +1,49 @@
+
+Voy a revisar cómo se construye y dibuja la ruta para eliminar esos giros artificiales y combinar la red de nodos con un trazado más natural.
+
+
+0123456789
+ actions taken
+Encontré la causa: el trazado usa cada conexión del grafo como una esquina visible y además dibuja el origen/destino sin ajustar el último tramo al sendero real. Voy a sustituirlo por una ruta “anclada” a nodos, con eliminación de microtramos, suavizado de colinealidad y sin cortes de segmento.
+
+
+0123456789
+ files read
+I see the problem clearly. The route draws every single node as a vertex, creating micro-zigzags, and the raw origin/destination points create straight cuts across paths. I'll fix this with three changes: simplify the drawn polyline (Douglas-Peucker), snap endpoints to the path, and only show real turns in instructions.
+
+
+Edited
+index.html
+Open
+Now I need to update the distanciaTotalRuta function to work with plain coordinate objects (not just Leaflet LatLng objects), since the new code passes rutaSimplificada which is plain {lat, lng} objects.
+
+
+Edited
+index.html
+Open
+Now let me verify the key functions are consistent by checking the modified sections.
+
+
+Searched
+simplificarRutaDP|generarIndicacionesSimplificadas|distanciaTotalRuta|planificarRuta
+Open
+Todo es coherente. La distanciaTotalRutafunción de la línea 1392 funciona tanto con objetos simples como con objetos Leaflet LatLng, ya que ambos tienen las propiedades .laty .lng. El objeto coordsRutaActualalmacenado en dibujarRutacontiene objetos Leaflet LatLng que también tienen .laty .lng, por lo que la distancia de llegada modal también funcionará correctamente.
+
+Permítanme hacer una rápida comprobación de sintaxis para asegurarme de que no haya errores obvios de JavaScript.
+
+
+Comprueba la sintaxis de JavaScript en index.html.
+Abierto
+Plan
+Corrección de zigzags en la ruta: simplificación de Douglas-Peucker + ajuste de los puntos finales a la ruta.
+Instrucciones de corrección: mostrar solo giros reales (>30 grados), usar texto cardinal de 8 direcciones
+Verificar que la sintaxis de JavaScript sea correcta
+Plan completado
+Abrir detalles
+Las rutas ahora se trazan como lo hace Google Maps. Aquí tres cambios clave:
+
+Elimina los micro-giros artificiales : La ruta ya no dibuja cada nodo de tu red de senderos como un vértice visible. Ahora se aplica un algoritmo de simplificación (Douglas-Peucker) que detecta qué nodos están casi en línea recta y los fusiona en un solo tramo limpio, con una tolerancia de 2,5 metros. El resultado es una línea suave que sigue tus senderos pero sin los zigzags innecesarios.
+
+Las indicaciones solo muestran giros reales : Antes, cualquier pequeña desviación del grafo generaba un "gira a la derecha" o "gira a la izquierda". Ahora solo aparece una instrucción de giro cuando el cambio de dirección supera los 30 grados. Además, las direcciones ahora usan 8 puntos cardinales (norte, noreste, este, sureste, etc.) en lugar de solo 4, igual que Google Maps.
+
+La línea lila se dibuja sobre la ruta simplificada : El borde blanco y la línea segmentada lila ahora siguen la ruta limpia y suavizada, no la ruta cruda del grafo, por lo que se ve como una sola línea continua en lugar de una sucesión de segmentos cortos.
