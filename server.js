@@ -39,6 +39,11 @@ async function supabaseRequest(endpoint, options = {}) {
   return { ok: response.ok, status: response.status, body };
 }
 
+function normalizarModuloId(value) {
+  const match = String(value ?? "").match(/(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -57,7 +62,7 @@ function readRequestBody(req) {
 async function handleVisits(req, res) {
   if (req.method === "GET") {
     const result = await supabaseRequest(
-      "/rest/v1/uagrm_visitas_ranking?select=modulo_id,modulo_nombre,visitas,ultima_visita&order=visitas.desc,modulo_nombre.asc",
+      "/rest/v1/uagrm_visitas?select=modulo_id,nombre,visitas,ultima_visita&order=visitas.desc,nombre.asc",
       { method: "GET", headers: { Accept: "application/json" } },
     );
 
@@ -74,7 +79,12 @@ async function handleVisits(req, res) {
       });
     }
 
-    const entries = Array.isArray(result.body) ? result.body : [];
+    const entries = (Array.isArray(result.body) ? result.body : []).map((entry) => ({
+      modulo_id: normalizarModuloId(entry.modulo_id),
+      modulo_nombre: entry.nombre,
+      visitas: Number(entry.visitas) || 0,
+      ultima_visita: entry.ultima_visita || null,
+    })).filter((entry) => Number.isInteger(entry.modulo_id));
     const totalVisits = entries.reduce(
       (total, entry) => total + (Number(entry.visitas) || 0),
       0,
@@ -103,19 +113,55 @@ async function handleVisits(req, res) {
       return sendJson(res, 400, { ok: false, message: "Módulo inválido." });
     }
 
-    const result = await supabaseRequest("/rest/v1/uagrm_visitas", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        modulo_id: moduloId,
-        modulo_nombre: moduloNombre,
-        visitado_en: new Date().toISOString(),
-      }),
-    });
+    const moduloKey = `modulo_${moduloId}`;
+    const existing = await supabaseRequest(
+      `/rest/v1/uagrm_visitas?select=id,modulo_id,visitas&modulo_id=eq.${encodeURIComponent(moduloKey)}&limit=1`,
+      { method: "GET", headers: { Accept: "application/json" } },
+    );
+    if (!existing.ok) {
+      return sendJson(res, 503, {
+        ok: false,
+        message: "No se pudo consultar el resumen global de visitas.",
+        providerError: existing.body,
+      });
+    }
+
+    const now = new Date().toISOString();
+    let result;
+    if (Array.isArray(existing.body) && existing.body[0]) {
+      const row = existing.body[0];
+      result = await supabaseRequest(
+        `/rest/v1/uagrm_visitas?id=eq.${encodeURIComponent(row.id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            nombre: moduloNombre,
+            visitas: (Number(row.visitas) || 0) + 1,
+            ultima_visita: now,
+          }),
+        },
+      );
+    } else {
+      result = await supabaseRequest("/rest/v1/uagrm_visitas", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          modulo_id: moduloKey,
+          nombre: moduloNombre,
+          visitas: 1,
+          ultima_visita: now,
+        }),
+      });
+    }
 
     if (!result.ok) {
       const missingTable = result.status === 404 &&
