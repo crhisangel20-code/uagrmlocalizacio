@@ -2569,32 +2569,34 @@ function dibujarRuta(coords, ajustarVista) {
     const capasRuta = [];
 
     // Definir los círculos grandes (radio en metros)
-    const RADIO_EDIFICIO = 16;  // Ajusta este valor para que abarque el tamaño del edificio
-    const RADIO_USUARIO = 9;   // Radio del círculo del usuario (ajústalo como quieras)
+    const RADIO_EDIFICIO = 25;  // Ajusta este valor para que abarque el tamaño del edificio
+    const RADIO_USUARIO = 15;    // Radio del círculo del usuario
 
     let puntoInicioLila = null;
     let puntoFinLila = null;
 
-    // Obtener el último punto de la ruta (el destino)
-    const destinoFinal = coords[coords.length - 1];
+    // Obtener el centro del edificio (destino real) o el último punto de la ruta
+    const centroEdificio = (window.destinoActual && window.destinoActual.lat) 
+        ? { lat: window.destinoActual.lat, lng: window.destinoActual.lng } 
+        : coords[coords.length - 1];
 
     // Obtener la ubicación del usuario
     if (userLocation && userLocation.lat && userLocation.lng) {
-         // 1. Círculo VERDE del USUARIO
+        // 1. Círculo VERDE del USUARIO
         capasRuta.push(L.circle([userLocation.lat, userLocation.lng], {
             radius: RADIO_USUARIO,
-            color: '#0B6E4F', // Verde bandera UAGRM (para que combine con tu estilo)
+            color: '#0B6E4F', // Verde
             fillColor: '#0B6E4F',
             fillOpacity: 0.2,
             weight: 3
         }));
 
-        // 2. Calcular el punto de inicio en el BORDE del círculo del usuario hacia el destino
-        puntoInicioLila = puntoEnBorde(userLocation.lat, userLocation.lng, destinoFinal.lat, destinoFinal.lng, RADIO_USUARIO);
+        // 2. Calcular el punto de inicio en el BORDE del círculo del usuario hacia el edificio
+        puntoInicioLila = puntoEnBorde(userLocation.lat, userLocation.lng, centroEdificio.lat, centroEdificio.lng, RADIO_USUARIO);
     }
 
-    // 3. Círculo ROJO del DESTINO
-    capasRuta.push(L.circle([destinoFinal.lat, destinoFinal.lng], {
+    // 3. Círculo ROJO del EDIFICIO (centrado en el edificio real)
+    capasRuta.push(L.circle([centroEdificio.lat, centroEdificio.lng], {
         radius: RADIO_EDIFICIO,
         color: '#F0183D', // Rojo
         fillColor: '#F0183D',
@@ -2602,28 +2604,27 @@ function dibujarRuta(coords, ajustarVista) {
         weight: 3
     }));
 
-    // 4. Calcular el punto final en el BORDE del círculo del destino hacia el usuario
+    // 4. Calcular el punto final en el BORDE del círculo del edificio hacia el usuario
     if (puntoInicioLila) {
-        puntoFinLila = puntoEnBorde(destinoFinal.lat, destinoFinal.lng, userLocation.lat, userLocation.lng, RADIO_EDIFICIO);
+        puntoFinLila = puntoEnBorde(centroEdificio.lat, centroEdificio.lng, userLocation.lat, userLocation.lng, RADIO_EDIFICIO);
     }
 
-    // 5. Dibujar la LÍNEA LILA (simple) desde el borde del usuario hasta el borde del edificio
-    // Si hay una ruta completa (coords), la usamos, pero recortamos para que empiece en el borde y termine en el borde.
-    // Si la ruta es directa o el usuario está muy cerca, dibujamos una línea recta entre los bordes.
+    // 5. Dibujar la LÍNEA LILA desde el borde del usuario hasta el borde del edificio
     if (puntoInicioLila && puntoFinLila) {
-        // Creamos un array con los puntos de la ruta, pero reemplazando el primero por el borde de inicio
-        // y el último por el borde final.
+        // Copiamos la ruta calculada (si existe) y reemplazamos el primer y último punto
         let puntosRuta = [];
         if (coords && coords.length > 1) {
             puntosRuta = coords.slice(); // copiamos la ruta
+            // Reemplazamos el primer punto por el borde del usuario
             puntosRuta[0] = L.latLng(puntoInicioLila[0], puntoInicioLila[1]);
+            // Reemplazamos el último punto por el borde del edificio
             puntosRuta[puntosRuta.length - 1] = L.latLng(puntoFinLila[0], puntoFinLila[1]);
         } else {
             // Si no hay ruta (o es muy corta), dibujamos una simple línea recta entre los bordes
             puntosRuta = [L.latLng(puntoInicioLila[0], puntoInicioLila[1]), L.latLng(puntoFinLila[0], puntoFinLila[1])];
         }
 
-        // Suavizar la ruta (opcional, para que se vea bonita)
+        // Suavizar la ruta (para que se vea bonita)
         const puntosCurva = suavizarRuta(puntosRuta, 6);
 
         // Línea de borde blanca (para que resalte)
@@ -2701,7 +2702,7 @@ function dibujarRuta(coords, ajustarVista) {
             statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
             return;
         }
-        destinoActual = destino;
+        window.destinoActual = destino;
         const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
 
         // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: cuando esta ruta se calcula
