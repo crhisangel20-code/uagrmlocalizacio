@@ -1,0 +1,24 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crhisangel20-code/uagrmlocalizacio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/crhisangel20-code/uagrmlocalizacio/issues"
+  },
+  "homepage": "https://github.com/crhisangel20-code/uagrmlocalizacio#readme",
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.4.3"
+  }
+}
