@@ -1082,7 +1082,6 @@
             .btn-ingresar { padding: 12px 24px; }
         }
     </style>
-    <script src="https://unpkg.com/leaflet-curve@0.2.0/dist/leaflet.curve.js"></script>
 </head>
 <body>
 
@@ -2520,66 +2519,100 @@
         return { lila: coords.slice(0, -1), roja: coords.slice(-2) };
     }
 
-    function dibujarRuta(coords, ajustarVista) {
-        limpiarCapaRuta();
-        const tramos = dividirRutaPorTramoFinal(coords, 30);
-        const capasRuta = [];
-
-        if (tramos.lila.length >= 2) {
-    // Unir la ruta con el GPS del estudiante en tiempo real
-    if (userLocation && userLocation.lat && userLocation.lng) {
-        tramos.lila.push([userLocation.lat, userLocation.lng]);
-    }
-
-    // Línea de borde blanca
-    capasRuta.push(L.curve(crearCurva(tramos.lila), {
-        color: '#ffffff',
-        weight: 10,
-        opacity: 0.98,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-
-    // Línea lila principal
-    capasRuta.push(L.curve(crearCurva(tramos.lila), {
-        color: '#A855F7',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-}
-
-if (tramos.roja.length >= 2) {
-    // Unir la ruta con el GPS del estudiante en tiempo real
-    if (userLocation && userLocation.lat && userLocation.lng) {
-        tramos.roja.push([userLocation.lat, userLocation.lng]);
-    }
-
-    // Línea de borde blanca
-    capasRuta.push(L.curve(crearCurva(tramos.roja), {
-        color: '#ffffff',
-        weight: 10,
-        opacity: 0.98,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-
-    // Línea roja principal
-    capasRuta.push(L.curve(crearCurva(tramos.roja), {
-        color: '#F0183D',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-}
-
-        window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
-        if (ajustarVista && coords.length > 1) {
-            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
+ // Fábrica de curvas casera (no necesita internet, no falla)
+function suavizarRuta(puntos, pasos) {
+    if (!puntos || puntos.length < 3) return puntos;
+    pasos = pasos || 6; // Suavidad de la curva
+    var nuevosPuntos = [puntos[0]];
+    for (var i = 0; i < puntos.length - 1; i++) {
+        var p0 = puntos[i === 0 ? 0 : i - 1];
+        var p1 = puntos[i];
+        var p2 = puntos[i + 1];
+        var p3 = puntos[i + 2 < puntos.length ? i + 2 : puntos.length - 1];
+        for (var t = 1; t < pasos; t++) {
+            var t1 = t / pasos;
+            var t2 = t1 * t1;
+            var t3 = t2 * t1;
+            var lat = 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * t1 + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
+            var lng = 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * t1 + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
+            nuevosPuntos.push(L.latLng(lat, lng));
         }
+        nuevosPuntos.push(p2);
     }
+    return nuevosPuntos;
+}
+
+function dibujarRuta(coords, ajustarVista) {
+    limpiarCapaRuta();
+    const tramos = dividirRutaPorTramoFinal(coords, 30);
+    const capasRuta = [];
+
+    // ====== LÍNEA LILA (curva) ======
+    if (tramos.lila.length >= 2) {
+        var lilaCurva = suavizarRuta(tramos.lila, 6);
+        capasRuta.push(L.polyline(lilaCurva, {
+            color: '#ffffff',
+            weight: 10,
+            opacity: 0.98,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+        capasRuta.push(L.polyline(lilaCurva, {
+            color: '#A855F7',
+            weight: 6,
+            opacity: 1,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+    }
+
+    // ====== LÍNEA ROJA (curva) ======
+    if (tramos.roja.length >= 2) {
+        var rojaCurva = suavizarRuta(tramos.roja, 6);
+        capasRuta.push(L.polyline(rojaCurva, {
+            color: '#ffffff',
+            weight: 10,
+            opacity: 0.98,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+        capasRuta.push(L.polyline(rojaCurva, {
+            color: '#F0183D',
+            weight: 6,
+            opacity: 1,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+    }
+
+    // ====== CÍRCULO DEL DESTINO (radio 5m) ======
+    if (coords && coords.length > 0) {
+        var destinoFinal = coords[coords.length - 1];
+        capasRuta.push(L.circle([destinoFinal.lat, destinoFinal.lng], {
+            radius: 5,
+            color: '#F0183D',
+            fillColor: '#F0183D',
+            fillOpacity: 0.2,
+            weight: 2
+        }));
+    }
+
+    // ====== CÍRCULO DEL ORIGEN (GPS) (radio 5m) ======
+    if (userLocation && userLocation.lat && userLocation.lng) {
+        capasRuta.push(L.circle([userLocation.lat, userLocation.lng], {
+            radius: 5,
+            color: '#3E7CB1',
+            fillColor: '#3E7CB1',
+            fillOpacity: 0.2,
+            weight: 2
+        }));
+    }
+
+    window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
+    if (ajustarVista && coords.length > 1) {
+        map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
+    }
+}
 
     function crearRutaDirecta(originLatLng, destino, distanciaMetros) {
         const origen = L.latLng(originLatLng.lat, originLatLng.lng);
