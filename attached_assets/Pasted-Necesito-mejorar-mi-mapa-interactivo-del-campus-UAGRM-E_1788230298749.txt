@@ -1,0 +1,97 @@
+Necesito mejorar mi mapa interactivo del campus UAGRM. El problema principal es que el GPS muestra rutas ABSURDAS E INCOHERENTES cuando el usuario está cerca del destino (como se ve en la imagen: estando cerca del Módulo 245, la ruta da vueltas innecesarias en lugar de ir directo).
+
+El código está en: https://github.com/crhisangel20-code/uagrmlocalizacio
+
+---
+
+## 🔴 PROBLEMA CRÍTICO A CORREGIR (Prioridad Máxima)
+
+**RUTAS ABSURDAS CUANDO ESTÁ CERCA DEL DESTINO:**
+- Cuando el usuario está a menos de 50 metros del destino, la ruta NO debe dar vueltas innecesarias.
+- Si la distancia es menor a 30 metros, la ruta debe ser DIRECTA (línea recta) usando la ubicación GPS actual, sin desviarse por senderos.
+- Si la distancia es menor a 15 metros, la ruta debe FINALIZAR y mostrar el mensaje "🎉 Has llegado a tu destino".
+- La línea de ruta debe DESAPARECER al llegar al destino.
+
+**EJEMPLO DE LO QUE NO DEBE PASAR:**
+- Estás a 20 metros del Módulo 245 y la ruta te hace caminar 162 metros dando vueltas. ❌
+- Lo correcto: si estás a 20 metros, la ruta debe ser directa (línea recta) o finalizar. ✅
+
+---
+
+## 🗺️ CORRECCIÓN DE CÁLCULO DE RUTAS
+
+1. **ALGORITMO DE RUTAS CORREGIDO:**
+   - Calcular la distancia REAL entre el usuario y el destino usando coordenadas GPS.
+   - Si la distancia es MENOR a 50 metros:
+     * Trazar línea DIRECTA desde la ubicación actual al destino (sin usar senderos).
+     * Mostrar mensaje "Estás muy cerca, sigue recto hacia el punto rojo".
+   - Si la distancia es MENOR a 15 metros:
+     * FINALIZAR la ruta automáticamente.
+     * OCULTAR la línea de ruta.
+     * Mostrar "🎉 ¡Has llegado a tu destino!".
+   - Si la distancia es MAYOR a 50 metros:
+     * Calcular ruta usando los senderos de senderos.json combinados con GPS.
+
+2. **COMBINAR SENDEROS + GPS PARA PRECISIÓN:**
+   - Usar los nodos y aristas de senderos.json para rutas largas (+50m).
+   - Usar coordenadas GPS en tiempo real para rutas cortas (-50m).
+   - La precisión debe ser de ±5 metros.
+
+3. **RECÁLCULO EN TIEMPO REAL:**
+   - Actualizar la ruta cada 5 segundos mientras el usuario se mueve.
+   - Si la distancia al destino cambia drásticamente, recalcular automáticamente.
+
+4. **VALIDACIÓN DE LLEGADA:**
+   - Cuando la distancia sea MENOR a 15 metros:
+     * Ocultar la línea de ruta COMPLETAMENTE.
+     * Mostrar notificación "🎉 Has llegado a tu destino".
+     * Detener el recálculo automático.
+
+---
+
+## 🎨 MEJORAS VISUALES
+
+5. **LÍNEA DE RUTA LILA CONTINUA:**
+   - Color LILA (morado claro) con borde blanco.
+   - Grosor: 4-5 píxeles.
+   - Debe ser CONTINUA (no segmentada, no punteada).
+
+6. **MARCADOR DE DESTINO:**
+   - PUNTO ROJO FLUORESCENTE (🔴) con borde blanco.
+   - Animación de pulso para visibilidad.
+
+7. **INTERACCIÓN TÁCTIL:**
+   - Rotación de ejes (dos dedos) en móvil.
+   - Tocar y mantener para seleccionar punto de interés.
+
+---
+
+## 📊 ESTADÍSTICAS GLOBALES
+
+8. **SISTEMA DE ESTADÍSTICAS COMPLETO:**
+   - Usar Firebase o Supabase (gratuitos).
+   - Guardar visitas por módulo con timestamp.
+   - Mostrar TODOS los módulos ordenados de más a menos visitados.
+   - Mostrar total de visitas y módulo más visitado.
+
+---
+
+## 📌 PRIORIDAD DE IMPLEMENTACIÓN
+
+1. ✅ CORREGIR RUTAS ABSURDAS (distancia < 50m = línea directa, < 15m = finalizar)
+2. ✅ Ocultar línea al llegar al destino
+3. ✅ Línea lila continua
+4. ✅ Marcador rojo fluorescente
+5. ✅ Interacción táctil (rotación, selección)
+6. ✅ Estadísticas globales (ranking completo)
+
+---
+
+## 🔧 NOTAS ADICIONALES
+
+- LA PRIORIDAD MÁXIMA ES CORREGIR LAS RUTAS ABSURDAS CUANDO EL USUARIO ESTÁ CERCA DEL DESTINO.
+- Si la distancia < 15 metros = FINALIZAR RUTA Y OCULTAR LÍNEA.
+- NO usar senderos para distancias cortas (< 50m), usar línea directa GPS.
+- Las estadísticas deben mostrar TODOS los módulos, no solo top 5.
+
+Implementa en este orden. Después de cada paso, avísame "Listo" para probar.

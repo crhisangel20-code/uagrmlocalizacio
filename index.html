@@ -278,6 +278,21 @@
             border: 2px solid var(--border-soft);
             z-index: 1;
         }
+        /* Ruta peatonal: el borde blanco mantiene la línea visible sobre
+           el mapa y el color lila identifica la navegación activa. */
+        .ruta-destino-marker {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #ff1744;
+            border: 3px solid #fff;
+            box-shadow: 0 0 0 2px rgba(255,23,68,0.35), 0 0 14px rgba(255,23,68,0.9);
+            animation: pulsoDestino 1.5s ease-out infinite;
+        }
+        @keyframes pulsoDestino {
+            0%, 100% { transform: scale(0.92); box-shadow: 0 0 0 2px rgba(255,23,68,0.35), 0 0 14px rgba(255,23,68,0.9); }
+            50% { transform: scale(1.08); box-shadow: 0 0 0 9px rgba(255,23,68,0.05), 0 0 20px rgba(255,23,68,1); }
+        }
         body.dark-mode .leaflet-tile-pane { filter: var(--map-filter); transition: filter 0.3s ease; }
         body.dark-mode .leaflet-control-container .leaflet-control { background: var(--bg-card); color: var(--text-main); border-color: var(--border-soft); }
         body.dark-mode .leaflet-bar a { background: var(--bg-card); color: var(--text-main); border-color: var(--border-soft); }
@@ -649,6 +664,31 @@
             color: #6a7f74;
             font-size: 0.9rem;
             padding: 30px 10px;
+        }
+        .estadisticas-resumen {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .estadistica-total {
+            padding: 12px 14px;
+            background: var(--verde-suave);
+            border-radius: 12px;
+        }
+        .estadistica-total .valor {
+            display: block;
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--verde-oscuro);
+        }
+        .estadistica-total .etiqueta {
+            display: block;
+            margin-top: 2px;
+            font-size: 0.7rem;
+            color: var(--tierra);
+            line-height: 1.25;
         }
         .btn-cerrar-estadisticas {
             width: 100%;
@@ -1168,7 +1208,17 @@
 <div class="modal-estadisticas-overlay hidden" id="modalEstadisticasOverlay">
     <div class="modal-estadisticas">
         <h2>📊 Estadísticas de visitas</h2>
-        <p class="modal-sub">Ranking de los módulos más buscados</p>
+        <p class="modal-sub">Ranking de todos los módulos registrados</p>
+        <div class="estadisticas-resumen">
+            <div class="estadistica-total">
+                <span class="valor" id="totalVisitas">0</span>
+                <span class="etiqueta">Visitas totales</span>
+            </div>
+            <div class="estadistica-total">
+                <span class="valor" id="moduloMasVisitado">—</span>
+                <span class="etiqueta">Módulo más visitado</span>
+            </div>
+        </div>
         <div class="ranking-lista" id="rankingLista"></div>
         <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
     </div>
@@ -1708,16 +1758,100 @@
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
         markers[id].openPopup();
-        if (window.capaRutaPeatonal) { // AÑADIDO PARA RED DE SENDEROS: reemplaza la limpieza de L.Routing.control
-            map.removeLayer(window.capaRutaPeatonal);
-            window.capaRutaPeatonal = null;
-        }
+        limpiarCapaRuta();
         document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: volver a mostrar el texto de estado
         document.getElementById('statusMessage').textContent = '📍 Destino seleccionado. Usa tu ubicación (GPS) para calcular la ruta.';
         if (userLocation) {
             planificarRuta(userLocation, edificios.find(e => e.id === id));
         }
     });
+
+    // ===============================================================
+    // INTERACCIÓN TÁCTIL DEL MAPA
+    // ===============================================================
+    const mapElement = document.getElementById('mapid');
+    let pulsacionMapaId = null;
+    let inicioPulsacionMapa = null;
+    let gestoRotacion = null;
+    let rotacionMapaGrados = 0;
+
+    function obtenerLatLngDesdeToque(toque) {
+        const rect = mapElement.getBoundingClientRect();
+        return map.containerPointToLatLng(L.point(toque.clientX - rect.left, toque.clientY - rect.top));
+    }
+
+    function anguloEntreToques(a, b) {
+        return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    }
+
+    function seleccionarPuntoCercano(latlng) {
+        let masCercano = null;
+        let menorDistancia = Infinity;
+        edificios.forEach(function(edificio) {
+            const distanciaEdificio = distancia(latlng.lat, latlng.lng, edificio.lat, edificio.lng) * 1000;
+            if (distanciaEdificio < menorDistancia) {
+                menorDistancia = distanciaEdificio;
+                masCercano = edificio;
+            }
+        });
+        if (!masCercano || menorDistancia > 120) {
+            mostrarToastCerca('Mantén presionado cerca de un edificio para seleccionarlo.');
+            return;
+        }
+        select.value = String(masCercano.id);
+        select.dispatchEvent(new Event('change'));
+        mostrarToastCerca('📍 Destino seleccionado: ' + masCercano.nombre.replace(/^↪\s*/, ''));
+    }
+
+    mapElement.addEventListener('touchstart', function(event) {
+        if (event.touches.length === 2) {
+            if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
+            gestoRotacion = {
+                anguloInicial: anguloEntreToques(event.touches[0], event.touches[1]),
+                rotacionInicial: rotacionMapaGrados
+            };
+            return;
+        }
+        if (event.touches.length !== 1) return;
+        const toque = event.touches[0];
+        inicioPulsacionMapa = { x: toque.clientX, y: toque.clientY };
+        pulsacionMapaId = setTimeout(function() {
+            seleccionarPuntoCercano(obtenerLatLngDesdeToque(toque));
+            pulsacionMapaId = null;
+        }, 650);
+    }, { passive: true });
+
+    mapElement.addEventListener('touchmove', function(event) {
+        if (event.touches.length === 1 && inicioPulsacionMapa) {
+            const toque = event.touches[0];
+            const seMovio = Math.hypot(toque.clientX - inicioPulsacionMapa.x, toque.clientY - inicioPulsacionMapa.y);
+            if (seMovio > 12 && pulsacionMapaId) {
+                clearTimeout(pulsacionMapaId);
+                pulsacionMapaId = null;
+            }
+        }
+        if (event.touches.length !== 2 || !gestoRotacion) return;
+        event.preventDefault();
+        const delta = anguloEntreToques(event.touches[0], event.touches[1]) - gestoRotacion.anguloInicial;
+        rotacionMapaGrados = gestoRotacion.rotacionInicial + delta;
+        mapElement.style.transformOrigin = 'center center';
+        mapElement.style.transform = 'rotate(' + rotacionMapaGrados + 'deg)';
+    }, { passive: false });
+
+    mapElement.addEventListener('touchend', function(event) {
+        if (pulsacionMapaId) {
+            clearTimeout(pulsacionMapaId);
+            pulsacionMapaId = null;
+        }
+        inicioPulsacionMapa = null;
+        if (event.touches.length < 2) gestoRotacion = null;
+    }, { passive: true });
+    mapElement.addEventListener('touchcancel', function() {
+        if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
+        pulsacionMapaId = null;
+        inicioPulsacionMapa = null;
+        gestoRotacion = null;
+    }, { passive: true });
 
     // ===============================================================
     // AÑADIDO PARA ESTADÍSTICAS: contador de visitas por módulo en localStorage
@@ -1743,28 +1877,38 @@
         const rankingLista = document.getElementById('rankingLista');
         rankingLista.innerHTML = '';
 
-        const entradas = Object.values(visitas).sort(function(a, b) { return b.count - a.count; });
+        // Incluye también módulos con cero visitas para que el ranking sea
+        // global y completo, en vez de mostrar únicamente los seleccionados
+        // en este navegador.
+        const entradas = edificios.map(function(edificio) {
+            const visita = visitas[edificio.id] || {};
+            return { nombre: edificio.nombre, count: Number(visita.count) || 0 };
+        }).sort(function(a, b) {
+            return b.count - a.count || a.nombre.localeCompare(b.nombre);
+        });
+        const totalVisitas = entradas.reduce(function(total, entry) { return total + entry.count; }, 0);
+        const moduloMasVisitado = entradas.find(function(entry) { return entry.count > 0; });
+        document.getElementById('totalVisitas').textContent = totalVisitas;
+        document.getElementById('moduloMasVisitado').textContent = moduloMasVisitado
+            ? moduloMasVisitado.nombre.replace(/^↪\s*/, '')
+            : '—';
 
-        if (entradas.length === 0) {
-            rankingLista.innerHTML = '<div class="ranking-vacio">Aún no hay visitas registradas. Selecciona un edificio para empezar.</div>';
-        } else {
-            const maxVisitas = entradas[0].count;
-            entradas.forEach(function(entry, i) {
-                const posicion = i + 1;
-                const item = document.createElement('div');
-                item.className = 'ranking-item';
-                const clasePos = posicion <= 3 ? 'top-' + posicion : '';
-                const porcentaje = Math.round((entry.count / maxVisitas) * 100);
-                item.innerHTML =
-                    '<div class="ranking-posicion ' + clasePos + '">' + posicion + '</div>' +
-                    '<div class="ranking-info">' +
-                        '<div class="ranking-nombre">' + entry.nombre + '</div>' +
-                        '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
-                    '</div>' +
-                    '<div class="ranking-visitas">' + entry.count + ' ' + (entry.count === 1 ? 'visita' : 'visitas') + '</div>';
-                rankingLista.appendChild(item);
-            });
-        }
+        const maxVisitas = entradas[0] ? entradas[0].count : 0;
+        entradas.forEach(function(entry, i) {
+            const posicion = i + 1;
+            const item = document.createElement('div');
+            item.className = 'ranking-item';
+            const clasePos = posicion <= 3 ? 'top-' + posicion : '';
+            const porcentaje = maxVisitas ? Math.round((entry.count / maxVisitas) * 100) : 0;
+            item.innerHTML =
+                '<div class="ranking-posicion ' + clasePos + '">' + posicion + '</div>' +
+                '<div class="ranking-info">' +
+                    '<div class="ranking-nombre">' + entry.nombre + '</div>' +
+                    '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
+                '</div>' +
+                '<div class="ranking-visitas">' + entry.count + ' ' + (entry.count === 1 ? 'visita' : 'visitas') + '</div>';
+            rankingLista.appendChild(item);
+        });
 
         document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
     }
@@ -1781,7 +1925,10 @@
     // -------------------------------------------------------------
     // 5. GEOLOCALIZACIÓN Y LÓGICA DE RUTA
     const statusMsg = document.getElementById('statusMessage');
-    const COLOR_RUTA = '#A64CD9'; // AÑADIDO: color lila para la línea de ruta (antes era verde)
+    const COLOR_RUTA = '#A64CD9'; // color lila de navegación
+    const DISTANCIA_RUTA_DIRECTA_METROS = 50;
+    const UMBRAL_LLEGADA_METROS = 15;
+    const INTERVALO_ACTUALIZACION_RUTA_MS = 5000;
 
     // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el usuario se aleja del sendero
     // trazado más de este margen, se recalcula la ruta desde su posición
@@ -1797,6 +1944,9 @@
     let destinoActual = null;
     let watchId = null;
     let modoNavegacionActivo = false; // AÑADIDO PARA OPENROUTESERVICE
+    let tipoRutaActual = null;
+    let ultimaPosicionCalculoRuta = null;
+    let ultimoCalculoRutaMs = 0;
     const panelInstrucciones = document.getElementById('instruccionesPanel'); // AÑADIDO PARA OPENROUTESERVICE
     const listaInstrucciones = document.getElementById('listaInstrucciones'); // AÑADIDO PARA OPENROUTESERVICE
     const btnIniciarRutaPie = document.getElementById('btnIniciarRutaPie'); // AÑADIDO PARA OPENROUTESERVICE
@@ -1958,8 +2108,17 @@
     }
 
     function iconoOrigenDestino(tipo) {
-        const color = tipo === 'origen' ? '#3E7CB1' : '#D9A441';
-        const emoji = tipo === 'origen' ? '📍' : '🏁';
+        if (tipo === 'destino') {
+            return L.divIcon({
+                className: '',
+                html: '<div class="ruta-destino-marker" aria-label="Destino"></div>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11],
+                popupAnchor: [0, -14]
+            });
+        }
+        const color = '#3E7CB1';
+        const emoji = '📍';
         return L.divIcon({
             className: '',
             html: `<div class="pin-icono" style="background:${color};"><span>${emoji}</span></div>`,
@@ -2006,6 +2165,79 @@
         toastCercaTimeoutId = setTimeout(() => toast.classList.remove('visible'), 5000);
     }
 
+    function limpiarCapaRuta() {
+        if (window.capaRutaPeatonal) {
+            map.removeLayer(window.capaRutaPeatonal);
+            window.capaRutaPeatonal = null;
+        }
+    }
+
+    function dibujarRuta(coords, ajustarVista) {
+        limpiarCapaRuta();
+        const bordeRuta = L.polyline(coords, {
+            color: '#ffffff',
+            weight: 9,
+            opacity: 0.95,
+            lineCap: 'round',
+            lineJoin: 'round'
+        });
+        const lineaRuta = L.polyline(coords, {
+            color: COLOR_RUTA,
+            weight: 5,
+            opacity: 0.98,
+            lineCap: 'round',
+            lineJoin: 'round'
+        });
+        window.capaRutaPeatonal = L.featureGroup([bordeRuta, lineaRuta]).addTo(map);
+        if (ajustarVista && coords.length > 1) {
+            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
+        }
+    }
+
+    function crearRutaDirecta(originLatLng, destino, distanciaMetros) {
+        const origen = L.latLng(originLatLng.lat, originLatLng.lng);
+        const destinoLatLng = L.latLng(destino.lat, destino.lng);
+        return {
+            name: 'Ruta directa GPS',
+            tipo: 'directa',
+            coordinates: [origen, destinoLatLng],
+            pasos: [
+                { instruccion: 'Estás muy cerca, sigue recto hacia el punto rojo', distanciaMetros: Math.round(distanciaMetros) },
+                { instruccion: 'Has llegado a tu destino', distanciaMetros: 0 }
+            ],
+            summary: { totalDistance: distanciaMetros, totalTime: Math.round(distanciaMetros / 1.2) }
+        };
+    }
+
+    function actualizarRutaDirecta(originLatLng, destino, distanciaMetros, ajustarVista) {
+        const rutaDirecta = crearRutaDirecta(originLatLng, destino, distanciaMetros);
+        tipoRutaActual = 'directa';
+        window.rutaCoordsActuales = rutaDirecta.coordinates;
+        window.distanciaTotalRutaMetros = distanciaMetros;
+        dibujarRuta(rutaDirecta.coordinates, ajustarVista);
+        mostrarInstruccionesPeatonales(rutaDirecta.pasos, rutaDirecta.summary);
+    }
+
+    function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+        modoNavegacionActivo = false;
+        tipoRutaActual = null;
+        limpiarCapaRuta();
+        window.rutaCoordsActuales = null;
+        window.distanciaTotalRutaMetros = distanciaRecorrido || 0;
+        document.getElementById('infoPanel').classList.remove('solo-boton');
+        btnIniciarRutaPie.classList.add('hidden');
+        panelInstrucciones.classList.add('hidden');
+        statusMsg.textContent = '🎉 ¡Has llegado a tu destino!';
+        if (!window.alertaLlegadaMostrada) {
+            mostrarModalLlegada(destino, distanciaRecorrido, precisionGPS || 15);
+            window.alertaLlegadaMostrada = true;
+        }
+    }
+
     function planificarRuta(originLatLng, destino, opciones) {
         if (!destino) {
             statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
@@ -2024,6 +2256,7 @@
         const opts = opciones || {};
         const esRecalculoAutomatico = !!opts.recalculoAutomatico;
         const navegacionEstabaActivaAntes = modoNavegacionActivo;
+        const distanciaDirectaMetros = dist * 1000;
 
         // AÑADIDO PARA OPENROUTESERVICE: reiniciar estado de navegación/instrucciones
         // cada vez que se calcula una ruta nueva (nuevo destino u origen).
@@ -2042,11 +2275,11 @@
         // siempre los datos de la ruta recién calculada.
         window.rutaCoordsActuales = null;
         window.distanciaTotalRutaMetros = null;
+        tipoRutaActual = null;
+        ultimaPosicionCalculoRuta = { lat: originLatLng.lat, lng: originLatLng.lng };
+        ultimoCalculoRutaMs = Date.now();
 
-        if (window.capaRutaPeatonal) {
-            map.removeLayer(window.capaRutaPeatonal);
-            window.capaRutaPeatonal = null;
-        }
+        limpiarCapaRuta();
         if (window.originMarker) {
             map.removeLayer(window.originMarker);
             window.originMarker = null;
@@ -2077,7 +2310,7 @@
             { latLng: L.latLng(destino.lat, destino.lng) }
         ];
 
-        routerElegido.route(waypointsRuta, function(error, rutas) {
+        const completarRuta = function(error, rutas) {
             if (error || !rutas || !rutas.length) {
                 console.error('Error de enrutamiento:', error);
                 statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta. Intenta de nuevo.';
@@ -2087,10 +2320,8 @@
                 return;
             }
             const ruta = rutas[0];
-            window.capaRutaPeatonal = L.polyline(ruta.coordinates, {
-                color: COLOR_RUTA, weight: 5, opacity: 0.85 // AÑADIDO: línea lila en vez de verde
-            }).addTo(map);
-            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50] });
+            tipoRutaActual = ruta.tipo || 'senderos';
+            dibujarRuta(ruta.coordinates, true);
 
             // AÑADIDO: se guarda el trazado real de la ruta (coordenadas
             // que siguen los senderos/calles caminables) y su distancia
@@ -2120,7 +2351,20 @@
                 document.getElementById('infoPanel').classList.add('solo-boton');
                 btnIniciarRutaPie.classList.remove('hidden');
             }
-        }, null);
+        };
+
+        // Cerca del destino no se consulta la red de senderos: una ruta
+        // basada en nodos puede obligar al usuario a dar vueltas aunque ya
+        // esté prácticamente frente al edificio.
+        if (distanciaDirectaMetros <= UMBRAL_LLEGADA_METROS) {
+            finalizarRuta(destino, 15, distanciaDirectaMetros);
+            return;
+        }
+        if (distanciaDirectaMetros < DISTANCIA_RUTA_DIRECTA_METROS) {
+            completarRuta(null, [crearRutaDirecta(originLatLng, destino, distanciaDirectaMetros)]);
+        } else {
+            routerElegido.route(waypointsRuta, completarRuta, null);
+        }
 
         // AÑADIDO PARA GA4: evento de ruta calculada
         enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
@@ -2131,7 +2375,8 @@
             recalculo_automatico: esRecalculoAutomatico // AÑADIDO PARA RECÁLCULO AUTOMÁTICO
         });
 
-        if (watchId) navigator.geolocation.clearWatch(watchId);
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        watchId = null;
         window.alertaCercaMostrada = false; // AÑADIDO: renombrado y separado de la alerta de llegada
         window.alertaLlegadaMostrada = false; // AÑADIDO: nueva alerta específica de "ya llegaste"
         // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el recálculo es por desvío,
@@ -2144,6 +2389,7 @@
             function(pos) {
                 const userLat = pos.coords.latitude;
                 const userLng = pos.coords.longitude;
+                userLocation = { lat: userLat, lng: userLng };
 
                 // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
                 // "Iniciar ruta a pie", seguimos su posición en vivo
@@ -2156,6 +2402,35 @@
                 }
 
                 const distLineaRecta = distancia(userLat, userLng, destino.lat, destino.lng) * 1000;
+                const precisionGPS = pos.coords.accuracy || 15;
+
+                // La llegada siempre usa la distancia GPS directa. No se
+                // permite que un sendero con curvas impida finalizar cuando
+                // el usuario ya está a menos de 15 m del destino.
+                if (distLineaRecta <= UMBRAL_LLEGADA_METROS) {
+                    finalizarRuta(destino, precisionGPS, distLineaRecta);
+                    return;
+                }
+
+                // Entre 15 y 50 m la línea se actualiza con la posición GPS
+                // actual y nunca vuelve a entrar al algoritmo de senderos.
+                if (distLineaRecta < DISTANCIA_RUTA_DIRECTA_METROS) {
+                    actualizarRutaDirecta({ lat: userLat, lng: userLng }, destino, distLineaRecta, false);
+                    statusMsg.textContent = 'Estás muy cerca, sigue recto hacia el punto rojo';
+                    if (modoNavegacionActivo) btnIniciarRutaPie.classList.add('hidden');
+                    if (!window.alertaCercaMostrada) {
+                        mostrarToastCerca('Estás muy cerca, sigue recto hacia el punto rojo');
+                        window.alertaCercaMostrada = true;
+                    }
+                    return;
+                }
+
+                // Si el usuario se aleja después de estar en el tramo
+                // directo, se reconstruye la ruta larga desde su GPS.
+                if (tipoRutaActual === 'directa') {
+                    planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
+                    return;
+                }
 
                 // AÑADIDO: si existe una ruta trazada (red de senderos u
                 // OpenRouteService), la distancia restante se mide
@@ -2171,6 +2446,22 @@
                 // lectura de GPS también revisa si el usuario entró o
                 // salió de los polígonos del campus.
                 verificarEntradaCampus(userLat, userLng);
+
+                // Mientras la navegación está activa, refresca la ruta cada
+                // cinco segundos si el usuario realmente avanzó, evitando
+                // llamadas repetidas por el ruido normal del GPS.
+                const ahoraActualizacion = Date.now();
+                const metrosDesdeUltimoCalculo = ultimaPosicionCalculoRuta
+                    ? distancia(userLat, userLng, ultimaPosicionCalculoRuta.lat, ultimaPosicionCalculoRuta.lng) * 1000
+                    : Infinity;
+                if (
+                    modoNavegacionActivo &&
+                    metrosDesdeUltimoCalculo >= 5 &&
+                    ahoraActualizacion - ultimoCalculoRutaMs >= INTERVALO_ACTUALIZACION_RUTA_MS
+                ) {
+                    planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
+                    return;
+                }
 
                 // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el usuario se aleja
                 // del sendero trazado más del margen permitido, se recalcula
@@ -2190,26 +2481,7 @@
                     }
                 }
 
-                // AÑADIDO: detección de llegada basada en la precisión REAL
-                // que el propio GPS del dispositivo reporta en cada lectura
-                // (pos.coords.accuracy, en metros). Un GPS de celular nunca
-                // es exacto a 0 m — su margen de error típico es de 5 a 20 m
-                // al aire libre. En vez de un número fijo inventado, usamos
-                // el margen de error real de ESE dispositivo en ESE momento,
-                // acotado entre 8 y 25 m para evitar falsos positivos si el
-                // GPS reporta una precisión muy mala (ej. bajo techo).
-                const precisionGPS = pos.coords.accuracy || 15;
-                const radioLlegada = Math.min(Math.max(precisionGPS, 8), 25);
-
-                if (dMetros <= radioLlegada) {
-                    statusMsg.innerHTML = `🎉 ¡Has llegado a tu destino: ${destino.nombre}! (±${Math.round(precisionGPS)} m de precisión GPS)`;
-                    if (!window.alertaLlegadaMostrada) {
-                        mostrarModalLlegada(destino, window.distanciaTotalRutaMetros, precisionGPS);
-                        window.alertaLlegadaMostrada = true;
-                    }
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                } else if (dMetros <= 100) {
+                if (dMetros <= 100) {
                     // AÑADIDO: este aviso ahora NO detiene el GPS — sigue
                     // rastreando hasta detectar la llegada real, y usa la
                     // distancia restante sobre el sendero real (no línea recta).
