@@ -23,6 +23,10 @@ function sendJson(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    // ⬇️ NUEVAS LÍNEAS DE CORS ⬇️
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
   });
   res.end(JSON.stringify(body));
 }
@@ -195,13 +199,32 @@ function serveStatic(req, res, pathname) {
       return sendJson(res, 404, { ok: false, message: "Recurso no encontrado." });
     }
     const contentType = MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": contentType });
+    // ⬇️ NUEVAS LÍNEAS DE CORS PARA ARCHIVOS ESTÁTICOS ⬇️
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Accept",
+    });
     fs.createReadStream(filePath).pipe(res);
   });
 }
 
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  
+  // ⬇️ NUEVA LÓGICA PARA RESPUESTAS PRE-VUELO (OPTIONS) ⬇️
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Accept",
+      "Access-Control-Max-Age": 86400,
+    });
+    res.end();
+    return;
+  }
+
   try {
     if (requestUrl.pathname === "/api/visits") {
       await handleVisits(req, res);
