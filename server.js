@@ -1,11 +1,13 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const { ReplitConnectors } = require("@replit/connectors-sdk");
 
 const PORT = Number(process.env.PORT || 5000);
 const ROOT = __dirname;
-const connectors = new ReplitConnectors();
+
+// Lee las llaves desde Railway
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -23,7 +25,6 @@ function sendJson(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    // ⬇️ NUEVAS LÍNEAS DE CORS ⬇️
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Accept",
@@ -32,7 +33,13 @@ function sendJson(res, status, body) {
 }
 
 async function supabaseRequest(endpoint, options = {}) {
-  const response = await connectors.proxy("supabase", endpoint, options);
+  const url = `${SUPABASE_URL}${endpoint}`;
+  const headers = {
+    ...options.headers,
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  };
+  const response = await fetch(url, { ...options, headers });
   const text = await response.text();
   let body = null;
   try {
@@ -199,7 +206,6 @@ function serveStatic(req, res, pathname) {
       return sendJson(res, 404, { ok: false, message: "Recurso no encontrado." });
     }
     const contentType = MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
-    // ⬇️ NUEVAS LÍNEAS DE CORS PARA ARCHIVOS ESTÁTICOS ⬇️
     res.writeHead(200, {
       "Content-Type": contentType,
       "Access-Control-Allow-Origin": "*",
@@ -213,7 +219,6 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   
-  // ⬇️ NUEVA LÓGICA PARA RESPUESTAS PRE-VUELO (OPTIONS) ⬇️
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
