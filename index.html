@@ -1531,6 +1531,62 @@
         return total;
     }
 
+    // Simplificación Douglas-Peucker conservadora. La tolerancia se expresa
+    // en kilómetros (0.0004 km = 0.4 m), para quitar micro-puntos sin
+    // convertir los senderos reales en atajos que crucen edificios.
+    const TOLERANCIA_DOUGLAS_PEUCKER_KM = 0.0004;
+
+    function puntoEnKilometros(coordenada) {
+        const cosLat = Math.cos(coordenada.lat * Math.PI / 180);
+        return {
+            x: coordenada.lng * 111.32 * cosLat,
+            y: coordenada.lat * 111.32
+        };
+    }
+
+    function distanciaPerpendicularKilometros(punto, inicio, fin) {
+        const p = puntoEnKilometros(punto);
+        const a = puntoEnKilometros(inicio);
+        const b = puntoEnKilometros(fin);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const largoCuadrado = dx * dx + dy * dy;
+        if (!largoCuadrado) return Math.hypot(p.x - a.x, p.y - a.y);
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / largoCuadrado));
+        return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    }
+
+    function simplificarRutaDouglasPeucker(coordenadas, toleranciaKm) {
+        if (!coordenadas || coordenadas.length <= 2) return coordenadas || [];
+        const tolerancia = toleranciaKm === undefined
+            ? TOLERANCIA_DOUGLAS_PEUCKER_KM
+            : toleranciaKm;
+
+        function simplificarDesde(inicio, fin) {
+            let indiceMayor = -1;
+            let distanciaMayor = tolerancia;
+            for (let i = inicio + 1; i < fin; i++) {
+                const distanciaPunto = distanciaPerpendicularKilometros(
+                    coordenadas[i],
+                    coordenadas[inicio],
+                    coordenadas[fin]
+                );
+                if (distanciaPunto > distanciaMayor) {
+                    indiceMayor = i;
+                    distanciaMayor = distanciaPunto;
+                }
+            }
+            if (indiceMayor === -1) {
+                return [coordenadas[inicio], coordenadas[fin]];
+            }
+            const izquierda = simplificarDesde(inicio, indiceMayor);
+            const derecha = simplificarDesde(indiceMayor, fin);
+            return izquierda.slice(0, -1).concat(derecha);
+        }
+
+        return simplificarDesde(0, coordenadas.length - 1);
+    }
+
     function seleccionarRutaConAccesoAlModulo(grafo, inicioId, destino, nodoRespaldo) {
         const busqueda = dijkstraDesdeTodos(grafo, inicioId);
         let mejorNodo = null;
@@ -2264,6 +2320,45 @@
         return dentro;
     }
 
+    const UMBRAL_FUERA_CAMPUS_METROS = 100;
+
+    function distanciaMinimaASenderos(lat, lng) {
+        if (!redSenderos || !redSenderos.nodos || !redSenderos.nodos.length) {
+            return Infinity;
+        }
+        const nodosPorId = {};
+        redSenderos.nodos.forEach(function(nodo) {
+            nodosPorId[nodo.id] = nodo;
+        });
+        let menorDistancia = Infinity;
+        (redSenderos.aristas || []).forEach(function(arista) {
+            const inicio = nodosPorId[arista[0]];
+            const fin = nodosPorId[arista[1]];
+            if (!inicio || !fin) return;
+            const proyeccion = proyectarEnSegmento(lat, lng, inicio, fin);
+            const distanciaAlTramo = distancia(lat, lng, proyeccion.lat, proyeccion.lng) * 1000;
+            if (distanciaAlTramo < menorDistancia) menorDistancia = distanciaAlTramo;
+        });
+        if (!Number.isFinite(menorDistancia)) {
+            redSenderos.nodos.forEach(function(nodo) {
+                menorDistancia = Math.min(
+                    menorDistancia,
+                    distancia(lat, lng, nodo.lat, nodo.lng) * 1000
+                );
+            });
+        }
+        return menorDistancia;
+    }
+
+    function actualizarEnlaceGoogleMaps(lat, lng) {
+        const boton = document.getElementById('btnGoogleMaps');
+        if (!boton || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const destinoGoogle = 'UAGRM Universidad Autonoma Gabriel Rene Moreno Santa Cruz de la Sierra Bolivia';
+        boton.href = 'https://www.google.com/maps/dir/?api=1&origin=' +
+            encodeURIComponent(lat + ',' + lng) +
+            '&destination=' + encodeURIComponent(destinoGoogle);
+    }
+
     // AÑADIDO PARA DETECCIÓN DE "ENTRASTE AL CAMPUS": recuerda en qué
     // campus(es) está el usuario ahora mismo, para avisar SOLO al entrar
     // (no en cada lectura de GPS mientras ya está adentro) y para poder
@@ -2287,13 +2382,15 @@
             }
         });
 
-        // AÑADIDO PARA DETECCIÓN FUERA DEL CAMPUS: si el usuario no está
-        // dentro de NINGÚN campus, muestra el aviso de advertencia con el
-        // botón para abrir Google Maps con la ruta a la UAGRM.
-        const dentroDeAlgunCampus = window.camposDondeEstaDentro.size > 0;
+        // AÑADIDO PARA DETECCIÓN FUERA DEL CAMPUS: el aviso se basa en la
+        // distancia real a la red de senderos, no en una caja rectangular.
+        // Así funciona también en los bordes y accesos del campus.
+        const distanciaSenderos = distanciaMinimaASenderos(lat, lng);
+        const estaFueraDelCampus = distanciaSenderos > UMBRAL_FUERA_CAMPUS_METROS;
         const avisoFueraCampus = document.getElementById('avisoFueraCampus');
-        if (!dentroDeAlgunCampus) {
+        if (estaFueraDelCampus) {
             avisoFueraCampus.classList.remove('hidden');
+            actualizarEnlaceGoogleMaps(lat, lng);
         } else {
             avisoFueraCampus.classList.add('hidden');
         }
@@ -2364,23 +2461,91 @@
         }
     }
 
+    function dividirRutaPorTramoFinal(coords, distanciaRojaMetros) {
+        if (!coords || coords.length < 2) {
+            return { lila: [], roja: coords || [] };
+        }
+        const total = distanciaTotalCoordenadas(coords);
+        const tramoRojo = Math.max(1, distanciaRojaMetros || 30);
+        if (total <= tramoRojo) {
+            return { lila: [], roja: coords };
+        }
+
+        const inicioRojo = total - tramoRojo;
+        let acumulada = 0;
+        for (let i = 0; i < coords.length - 1; i++) {
+            const inicio = coords[i];
+            const fin = coords[i + 1];
+            const tramo = distancia(inicio.lat, inicio.lng, fin.lat, fin.lng) * 1000;
+            if (acumulada + tramo < inicioRojo) {
+                acumulada += tramo;
+                continue;
+            }
+
+            const proporcion = tramo > 0
+                ? Math.max(0, Math.min(1, (inicioRojo - acumulada) / tramo))
+                : 0;
+            const puntoInicioRojo = L.latLng(
+                inicio.lat + (fin.lat - inicio.lat) * proporcion,
+                inicio.lng + (fin.lng - inicio.lng) * proporcion
+            );
+            const lila = coords.slice(0, i + 1);
+            if (distancia(
+                lila[lila.length - 1].lat,
+                lila[lila.length - 1].lng,
+                puntoInicioRojo.lat,
+                puntoInicioRojo.lng
+            ) > 0.000001) {
+                lila.push(puntoInicioRojo);
+            }
+            return {
+                lila: lila,
+                roja: [puntoInicioRojo].concat(coords.slice(i + 1))
+            };
+        }
+        return { lila: coords.slice(0, -1), roja: coords.slice(-2) };
+    }
+
     function dibujarRuta(coords, ajustarVista) {
         limpiarCapaRuta();
-        const bordeRuta = L.polyline(coords, {
-            color: '#ffffff',
-            weight: 9,
-            opacity: 0.95,
-            lineCap: 'round',
-            lineJoin: 'round'
-        });
-        const lineaRuta = L.polyline(coords, {
-            color: COLOR_RUTA,
-            weight: 5,
-            opacity: 0.98,
-            lineCap: 'round',
-            lineJoin: 'round'
-        });
-        window.capaRutaPeatonal = L.featureGroup([bordeRuta, lineaRuta]).addTo(map);
+        const tramos = dividirRutaPorTramoFinal(coords, 30);
+        const capasRuta = [];
+
+        if (tramos.lila.length >= 2) {
+            capasRuta.push(L.polyline(tramos.lila, {
+                color: '#ffffff',
+                weight: 9,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }));
+            capasRuta.push(L.polyline(tramos.lila, {
+                color: COLOR_RUTA,
+                weight: 5,
+                opacity: 0.98,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }));
+        }
+
+        if (tramos.roja.length >= 2) {
+            capasRuta.push(L.polyline(tramos.roja, {
+                color: '#ffffff',
+                weight: 10,
+                opacity: 0.98,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }));
+            capasRuta.push(L.polyline(tramos.roja, {
+                color: '#F0183D',
+                weight: 6,
+                opacity: 1,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }));
+        }
+
+        window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
         if (ajustarVista && coords.length > 1) {
             map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
         }
@@ -2512,6 +2677,14 @@
                 return;
             }
             const ruta = rutas[0];
+            // Simplifica solo la geometría visible, conservando siempre el
+            // primer y el último punto exactos de la ruta.
+            ruta.coordinates = simplificarRutaDouglasPeucker(ruta.coordinates);
+            if (ruta.coordinates.length > 1) {
+                ruta.summary = ruta.summary || {};
+                ruta.summary.totalDistance = distanciaTotalCoordenadas(ruta.coordinates);
+                ruta.summary.totalTime = Math.round(ruta.summary.totalDistance / 1.2);
+            }
             tipoRutaActual = ruta.tipo || 'senderos';
             dibujarRuta(ruta.coordinates, true);
 
@@ -2769,7 +2942,11 @@
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
             function(pos) {
-                verificarEntradaCampus(pos.coords.latitude, pos.coords.longitude);
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                userLocation = { lat: lat, lng: lng };
+                actualizarEnlaceGoogleMaps(lat, lng);
+                verificarEntradaCampus(lat, lng);
             },
             function() { /* silencioso: sin permiso o sin señal, no se interrumpe la app */ },
             { enableHighAccuracy: false, maximumAge: 20000, timeout: 20000 }
