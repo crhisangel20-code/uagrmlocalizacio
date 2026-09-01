@@ -1465,6 +1465,129 @@
         return { camino: camino, distanciaTotal: distancias[finId] };
     }
 
+    // Evita que la conexión al último nodo del grafo obligue a dar una
+    // vuelta cuando ya existe un acceso peatonal corto al módulo. Solo se
+    // revisan los últimos vértices y solo se aplica si el atajo ahorra una
+    // distancia apreciable; las rutas largas y sus cruces intermedios quedan
+    // intactos.
+    const MAXIMO_ACCESO_FINAL_METROS = 50;
+    const MINIMO_AHORRO_ACCESO_FINAL_METROS = 10;
+    const MAXIMOS_VERTICES_REVISADOS_AL_FINAL = 14;
+
+    function distanciaTotalCoordenadas(coordenadas) {
+        let total = 0;
+        for (let i = 0; i < coordenadas.length - 1; i++) {
+            total += distancia(
+                coordenadas[i].lat,
+                coordenadas[i].lng,
+                coordenadas[i + 1].lat,
+                coordenadas[i + 1].lng
+            ) * 1000;
+        }
+        return total;
+    }
+
+    function optimizarAccesoFinalRuta(coordenadasBase, destino) {
+        if (!coordenadasBase || coordenadasBase.length < 4) return coordenadasBase;
+
+        const indiceUltimoNodo = coordenadasBase.length - 2;
+        const distanciaHasta = [];
+        const distanciaDesde = [];
+        distanciaHasta[0] = 0;
+        for (let i = 1; i < coordenadasBase.length; i++) {
+            distanciaHasta[i] = distanciaHasta[i - 1] + distancia(
+                coordenadasBase[i - 1].lat,
+                coordenadasBase[i - 1].lng,
+                coordenadasBase[i].lat,
+                coordenadasBase[i].lng
+            ) * 1000;
+        }
+        distanciaDesde[coordenadasBase.length - 1] = 0;
+        for (let i = coordenadasBase.length - 2; i >= 0; i--) {
+            distanciaDesde[i] = distanciaDesde[i + 1] + distancia(
+                coordenadasBase[i].lat,
+                coordenadasBase[i].lng,
+                coordenadasBase[i + 1].lat,
+                coordenadasBase[i + 1].lng
+            ) * 1000;
+        }
+
+        const distanciaBase = distanciaDesde[0];
+        const primerIndice = Math.max(1, indiceUltimoNodo - MAXIMOS_VERTICES_REVISADOS_AL_FINAL + 1);
+        let mejorIndice = -1;
+        let mejorPuntoAcceso = null;
+        let mejorCosto = distanciaBase;
+        let mejorAhorro = 0;
+
+        function considerarPuntoAcceso(indiceBase, puntoAcceso) {
+            const tramoHastaAcceso = distancia(
+                coordenadasBase[indiceBase].lat,
+                coordenadasBase[indiceBase].lng,
+                puntoAcceso.lat,
+                puntoAcceso.lng
+            ) * 1000;
+            const accesoDirecto = distancia(
+                puntoAcceso.lat,
+                puntoAcceso.lng,
+                destino.lat,
+                destino.lng
+            ) * 1000;
+            if (accesoDirecto > MAXIMO_ACCESO_FINAL_METROS) return;
+
+            const distanciaCola = distancia(
+                puntoAcceso.lat,
+                puntoAcceso.lng,
+                coordenadasBase[indiceBase + 1].lat,
+                coordenadasBase[indiceBase + 1].lng
+            ) * 1000 + distanciaDesde[indiceBase + 1];
+            const costoConAccesoDirecto = distanciaHasta[indiceBase] + tramoHastaAcceso + accesoDirecto;
+            const ahorro = distanciaCola - accesoDirecto;
+            if (
+                ahorro >= MINIMO_AHORRO_ACCESO_FINAL_METROS &&
+                costoConAccesoDirecto < mejorCosto
+            ) {
+                mejorIndice = indiceBase;
+                mejorPuntoAcceso = puntoAcceso;
+                mejorCosto = costoConAccesoDirecto;
+                mejorAhorro = ahorro;
+            }
+        }
+
+        for (let i = primerIndice; i <= indiceUltimoNodo; i++) {
+            // Primero se prueban los nodos existentes.
+            considerarPuntoAcceso(i, coordenadasBase[i]);
+
+            // También se prueba el punto del segmento más cercano al
+            // destino. Esto captura accesos cortos que quedan entre nodos y
+            // elimina curvas finales aunque ninguno de sus extremos esté
+            // dentro del umbral.
+            if (i < indiceUltimoNodo) {
+                const proyeccion = proyectarEnSegmento(
+                    destino.lat,
+                    destino.lng,
+                    coordenadasBase[i],
+                    coordenadasBase[i + 1]
+                );
+                considerarPuntoAcceso(i, proyeccion);
+            }
+        }
+
+        if (mejorIndice === -1 || mejorAhorro < MINIMO_AHORRO_ACCESO_FINAL_METROS) {
+            return coordenadasBase;
+        }
+
+        const rutaOptimizada = coordenadasBase.slice(0, mejorIndice + 1);
+        const ultimoPunto = rutaOptimizada[rutaOptimizada.length - 1];
+        if (distancia(ultimoPunto.lat, ultimoPunto.lng, mejorPuntoAcceso.lat, mejorPuntoAcceso.lng) > 1) {
+            rutaOptimizada.push(L.latLng(mejorPuntoAcceso.lat, mejorPuntoAcceso.lng));
+        }
+        const puntoFinal = rutaOptimizada[rutaOptimizada.length - 1];
+        if (distancia(puntoFinal.lat, puntoFinal.lng, destino.lat, destino.lng) > 1) {
+            rutaOptimizada.push(L.latLng(destino.lat, destino.lng));
+        }
+        return rutaOptimizada;
+    }
+
     // AÑADIDO PARA RED DE SENDEROS: calcula el rumbo (bearing) en grados
     // entre dos coordenadas, usado para generar indicaciones de giro.
     function calcularRumbo(lat1, lng1, lat2, lng2) {
@@ -1498,14 +1621,16 @@
                 return;
             }
 
-            // Construir la lista de coordenadas: origen real -> nodos de
-            // la red -> destino real
-            const coordenadasRuta = [L.latLng(origen.lat, origen.lng)];
+            // Construir la lista base: origen real -> nodos de la red ->
+            // destino real. Después se optimiza únicamente el acceso final
+            // para no conservar bucles innecesarios junto al módulo.
+            const coordenadasRutaBase = [L.latLng(origen.lat, origen.lng)];
             resultado.camino.forEach(function(id) {
                 const nodo = redSenderos.nodos.find(function(n) { return n.id === id; });
-                coordenadasRuta.push(L.latLng(nodo.lat, nodo.lng));
+                coordenadasRutaBase.push(L.latLng(nodo.lat, nodo.lng));
             });
-            coordenadasRuta.push(L.latLng(destinoWp.lat, destinoWp.lng));
+            coordenadasRutaBase.push(L.latLng(destinoWp.lat, destinoWp.lng));
+            const coordenadasRuta = optimizarAccesoFinalRuta(coordenadasRutaBase, destinoWp);
 
             // AÑADIDO: se reescribió la generación de pasos para agrupar
             // tramos rectos consecutivos en una sola indicación (antes
@@ -1555,8 +1680,8 @@
                 instructions: [],
                 pasos: pasos,
                 summary: {
-                    totalDistance: resultado.distanciaTotal,
-                    totalTime: Math.round(resultado.distanciaTotal / 1.2) // ~1.2 m/s caminando
+                    totalDistance: distanciaTotalCoordenadas(coordenadasRuta),
+                    totalTime: Math.round(distanciaTotalCoordenadas(coordenadasRuta) / 1.2) // ~1.2 m/s caminando
                 },
                 inputWaypoints: waypoints,
                 waypoints: waypoints,
