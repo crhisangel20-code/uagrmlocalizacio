@@ -2542,22 +2542,101 @@ function suavizarRuta(puntos, pasos) {
     return nuevosPuntos;
 }
 
+// Función para calcular el punto en el borde de un círculo, apuntando hacia otro punto
+function puntoEnBorde(latCentro, lngCentro, latOtro, lngOtro, radioMetros) {
+    const R = 6371000; // Radio de la tierra en metros
+    const dLat = (latOtro - latCentro) * Math.PI / 180;
+    const dLng = (lngOtro - lngCentro) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(latCentro * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180) * Math.sin(dLng/2)**2;
+    const distancia = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // distancia en metros
+    if (distancia === 0) return [latCentro, lngCentro]; // están en el mismo punto
+
+    // Ángulo (bearing) desde el centro hacia el otro punto
+    const y = Math.sin((lngOtro - lngCentro) * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180);
+    const x = Math.cos(latCentro * Math.PI / 180) * Math.sin(latOtro * Math.PI / 180) - 
+              Math.sin(latCentro * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180) * Math.cos((lngOtro - lngCentro) * Math.PI / 180);
+    const angulo = Math.atan2(y, x); // ángulo en radianes
+
+    // Coordenadas del punto en el borde (a radioMetros del centro, en dirección al otro punto)
+    const latBorde = latCentro + (radioMetros / R) * (180 / Math.PI) * Math.sin(angulo) / Math.cos(latCentro * Math.PI / 180);
+    const lngBorde = lngCentro + (radioMetros / R) * (180 / Math.PI) * Math.cos(angulo);
+
+    return [latBorde, lngBorde];
+}
+
 function dibujarRuta(coords, ajustarVista) {
     limpiarCapaRuta();
-    const tramos = dividirRutaPorTramoFinal(coords, 30);
     const capasRuta = [];
 
-    // ====== LÍNEA LILA (curva) ======
-    if (tramos.lila.length >= 2) {
-        var lilaCurva = suavizarRuta(tramos.lila, 6);
-        capasRuta.push(L.polyline(lilaCurva, {
+    // Definir los círculos grandes (radio en metros)
+    const RADIO_EDIFICIO = 16;  // Ajusta este valor para que abarque el tamaño del edificio
+    const RADIO_USUARIO = 9;   // Radio del círculo del usuario (ajústalo como quieras)
+
+    let puntoInicioLila = null;
+    let puntoFinLila = null;
+
+    // Obtener el último punto de la ruta (el destino)
+    const destinoFinal = coords[coords.length - 1];
+
+    // Obtener la ubicación del usuario
+    if (userLocation && userLocation.lat && userLocation.lng) {
+         // 1. Círculo VERDE del USUARIO
+        capasRuta.push(L.circle([userLocation.lat, userLocation.lng], {
+            radius: RADIO_USUARIO,
+            color: '#0B6E4F', // Verde bandera UAGRM (para que combine con tu estilo)
+            fillColor: '#0B6E4F',
+            fillOpacity: 0.2,
+            weight: 3
+        }));
+
+        // 2. Calcular el punto de inicio en el BORDE del círculo del usuario hacia el destino
+        puntoInicioLila = puntoEnBorde(userLocation.lat, userLocation.lng, destinoFinal.lat, destinoFinal.lng, RADIO_USUARIO);
+    }
+
+    // 3. Círculo ROJO del DESTINO
+    capasRuta.push(L.circle([destinoFinal.lat, destinoFinal.lng], {
+        radius: RADIO_EDIFICIO,
+        color: '#F0183D', // Rojo
+        fillColor: '#F0183D',
+        fillOpacity: 0.2,
+        weight: 3
+    }));
+
+    // 4. Calcular el punto final en el BORDE del círculo del destino hacia el usuario
+    if (puntoInicioLila) {
+        puntoFinLila = puntoEnBorde(destinoFinal.lat, destinoFinal.lng, userLocation.lat, userLocation.lng, RADIO_EDIFICIO);
+    }
+
+    // 5. Dibujar la LÍNEA LILA (simple) desde el borde del usuario hasta el borde del edificio
+    // Si hay una ruta completa (coords), la usamos, pero recortamos para que empiece en el borde y termine en el borde.
+    // Si la ruta es directa o el usuario está muy cerca, dibujamos una línea recta entre los bordes.
+    if (puntoInicioLila && puntoFinLila) {
+        // Creamos un array con los puntos de la ruta, pero reemplazando el primero por el borde de inicio
+        // y el último por el borde final.
+        let puntosRuta = [];
+        if (coords && coords.length > 1) {
+            puntosRuta = coords.slice(); // copiamos la ruta
+            puntosRuta[0] = L.latLng(puntoInicioLila[0], puntoInicioLila[1]);
+            puntosRuta[puntosRuta.length - 1] = L.latLng(puntoFinLila[0], puntoFinLila[1]);
+        } else {
+            // Si no hay ruta (o es muy corta), dibujamos una simple línea recta entre los bordes
+            puntosRuta = [L.latLng(puntoInicioLila[0], puntoInicioLila[1]), L.latLng(puntoFinLila[0], puntoFinLila[1])];
+        }
+
+        // Suavizar la ruta (opcional, para que se vea bonita)
+        const puntosCurva = suavizarRuta(puntosRuta, 6);
+
+        // Línea de borde blanca (para que resalte)
+        capasRuta.push(L.polyline(puntosCurva, {
             color: '#ffffff',
             weight: 10,
             opacity: 0.98,
             lineCap: 'round',
             lineJoin: 'round'
         }));
-        capasRuta.push(L.polyline(lilaCurva, {
+
+        // Línea lila principal
+        capasRuta.push(L.polyline(puntosCurva, {
             color: '#A855F7',
             weight: 6,
             opacity: 1,
@@ -2566,48 +2645,7 @@ function dibujarRuta(coords, ajustarVista) {
         }));
     }
 
-    // ====== LÍNEA ROJA (curva) ======
-    if (tramos.roja.length >= 2) {
-        var rojaCurva = suavizarRuta(tramos.roja, 6);
-        capasRuta.push(L.polyline(rojaCurva, {
-            color: '#ffffff',
-            weight: 10,
-            opacity: 0.98,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-        capasRuta.push(L.polyline(rojaCurva, {
-            color: '#F0183D',
-            weight: 6,
-            opacity: 1,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-    }
-
-    // ====== CÍRCULO DEL DESTINO (radio 5m) ======
-    if (coords && coords.length > 0) {
-        var destinoFinal = coords[coords.length - 1];
-        capasRuta.push(L.circle([destinoFinal.lat, destinoFinal.lng], {
-            radius: 5,
-            color: '#F0183D',
-            fillColor: '#F0183D',
-            fillOpacity: 0.2,
-            weight: 2
-        }));
-    }
-
-    // ====== CÍRCULO DEL ORIGEN (GPS) (radio 5m) ======
-    if (userLocation && userLocation.lat && userLocation.lng) {
-        capasRuta.push(L.circle([userLocation.lat, userLocation.lng], {
-            radius: 5,
-            color: '#3E7CB1',
-            fillColor: '#3E7CB1',
-            fillOpacity: 0.2,
-            weight: 2
-        }));
-    }
-
+    // Agregar todas las capas al mapa
     window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
     if (ajustarVista && coords.length > 1) {
         map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
