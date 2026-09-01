@@ -1239,8 +1239,6 @@
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-<script>
  <script>
     // Función para transformar líneas rectas en curvas suaves (estilo Google Maps)
     function crearCurva(puntos) {
@@ -1256,8 +1254,6 @@
         return d;
     }
 
-    // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
-    function enviarEventoGA4(nombreEvento, datos) {   
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
     function enviarEventoGA4(nombreEvento, datos) { // AÑADIDO PARA GA4
         if (typeof gtag === 'function') {
@@ -2529,39 +2525,55 @@
         const tramos = dividirRutaPorTramoFinal(coords, 30);
         const capasRuta = [];
 
-        if (tramos.lila.length >= 2) { 
-            capasRuta.push(L.polyline(tramos.lila, {
-                color: '#ffffff',
-                weight: 9,
-                opacity: 0.95,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }));
-            capasRuta.push(L.polyline(tramos.lila, {
-                color: COLOR_RUTA,
-                weight: 5,
-                opacity: 0.98,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }));
-        }
+        if (tramos.lila.length >= 2) {
+    // Unir la ruta con el GPS del estudiante en tiempo real
+    if (userLocation && userLocation.lat && userLocation.lng) {
+        tramos.lila.push([userLocation.lat, userLocation.lng]);
+    }
 
-        if (tramos.roja.length >= 2) {
-            capasRuta.push(L.polyline(tramos.roja, {
-                color: '#ffffff',
-                weight: 10,
-                opacity: 0.98,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }));
-            capasRuta.push(L.polyline(tramos.roja, {
-                color: '#F0183D',
-                weight: 6,
-                opacity: 1,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }));
-        }
+    // Línea de borde blanca
+    capasRuta.push(L.curve(crearCurva(tramos.lila), {
+        color: '#ffffff',
+        weight: 10,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+
+    // Línea lila principal
+    capasRuta.push(L.curve(crearCurva(tramos.lila), {
+        color: '#A855F7',
+        weight: 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+}
+
+if (tramos.roja.length >= 2) {
+    // Unir la ruta con el GPS del estudiante en tiempo real
+    if (userLocation && userLocation.lat && userLocation.lng) {
+        tramos.roja.push([userLocation.lat, userLocation.lng]);
+    }
+
+    // Línea de borde blanca
+    capasRuta.push(L.curve(crearCurva(tramos.roja), {
+        color: '#ffffff',
+        weight: 10,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+
+    // Línea roja principal
+    capasRuta.push(L.curve(crearCurva(tramos.roja), {
+        color: '#F0183D',
+        weight: 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+}
 
         window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
         if (ajustarVista && coords.length > 1) {
