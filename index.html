@@ -1082,6 +1082,7 @@
             .btn-ingresar { padding: 12px 24px; }
         }
     </style>
+    <script src="https://unpkg.com/leaflet-curve@0.2.0/dist/leaflet.curve.js"></script>
 </head>
 <body>
 
@@ -1240,6 +1241,23 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
+ <script>
+    // Función para transformar líneas rectas en curvas suaves (estilo Google Maps)
+    function crearCurva(puntos) {
+        if (!puntos || puntos.length < 2) return "";
+        let d = `M ${puntos[0][1]} ${puntos[0][0]}`; 
+        for (let i = 1; i < puntos.length; i++) {
+            const prev = puntos[i-1];
+            const curr = puntos[i];
+            const midX = (prev[1] + curr[1]) / 2;
+            const midY = (prev[0] + curr[0]) / 2;
+            d += ` Q ${midX} ${midY} ${curr[1]} ${curr[0]}`;
+        }
+        return d;
+    }
+
+    // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
+    function enviarEventoGA4(nombreEvento, datos) {   
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
     function enviarEventoGA4(nombreEvento, datos) { // AÑADIDO PARA GA4
         if (typeof gtag === 'function') {
