@@ -1,0 +1,1 @@
+- [Supabase schema provisioning](supabase-schema-provisioning.md) — the connector provides PostgREST access; DDL must be provisioned separately in the same Supabase project.
