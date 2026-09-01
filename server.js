@@ -62,7 +62,7 @@ function readRequestBody(req) {
 async function handleVisits(req, res) {
   if (req.method === "GET") {
     const result = await supabaseRequest(
-      "/rest/v1/uagrm_visitas?select=modulo_id,nombre,visitas,ultima_visita&order=visitas.desc,nombre.asc",
+      "/rest/v1/estadisticas?select=modulo_id,modulo_nombre,visitas,ultima_visita&order=visitas.desc,modulo_nombre.asc",
       { method: "GET", headers: { Accept: "application/json" } },
     );
 
@@ -81,7 +81,7 @@ async function handleVisits(req, res) {
 
     const entries = (Array.isArray(result.body) ? result.body : []).map((entry) => ({
       modulo_id: normalizarModuloId(entry.modulo_id),
-      modulo_nombre: entry.nombre,
+      modulo_nombre: entry.modulo_nombre,
       visitas: Number(entry.visitas) || 0,
       ultima_visita: entry.ultima_visita || null,
     })).filter((entry) => Number.isInteger(entry.modulo_id));
@@ -115,7 +115,7 @@ async function handleVisits(req, res) {
 
     const moduloKey = `modulo_${moduloId}`;
     const existing = await supabaseRequest(
-      `/rest/v1/uagrm_visitas?select=id,modulo_id,visitas&modulo_id=eq.${encodeURIComponent(moduloKey)}&limit=1`,
+      `/rest/v1/estadisticas?select=id,modulo_id,visitas&modulo_id=eq.${encodeURIComponent(moduloKey)}&limit=1`,
       { method: "GET", headers: { Accept: "application/json" } },
     );
     if (!existing.ok) {
@@ -131,7 +131,7 @@ async function handleVisits(req, res) {
     if (Array.isArray(existing.body) && existing.body[0]) {
       const row = existing.body[0];
       result = await supabaseRequest(
-        `/rest/v1/uagrm_visitas?id=eq.${encodeURIComponent(row.id)}`,
+        `/rest/v1/estadisticas?id=eq.${encodeURIComponent(row.id)}`,
         {
           method: "PATCH",
           headers: {
@@ -140,14 +140,14 @@ async function handleVisits(req, res) {
             Prefer: "return=minimal",
           },
           body: JSON.stringify({
-            nombre: moduloNombre,
+            modulo_nombre: moduloNombre,
             visitas: (Number(row.visitas) || 0) + 1,
             ultima_visita: now,
           }),
         },
       );
     } else {
-      result = await supabaseRequest("/rest/v1/uagrm_visitas", {
+      result = await supabaseRequest("/rest/v1/estadisticas", {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -156,7 +156,7 @@ async function handleVisits(req, res) {
         },
         body: JSON.stringify({
           modulo_id: moduloKey,
-          nombre: moduloNombre,
+          modulo_nombre: moduloNombre,
           visitas: 1,
           ultima_visita: now,
         }),
