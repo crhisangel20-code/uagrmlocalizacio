@@ -643,13 +643,16 @@
         .ranking-posicion.top-3 { color: #cd7f32; }
         .ranking-info { flex: 1; min-width: 0; }
         .ranking-nombre {
-            font-weight: 600;
-            font-size: 0.88rem;
-            color: var(--text-main);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text-main);
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
         .ranking-barra-bg {
             height: 6px;
             background: rgba(11,110,79,0.12);
