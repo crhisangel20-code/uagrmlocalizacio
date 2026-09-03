@@ -1941,92 +1941,71 @@
     });
 
     // ===============================================================
-    // INTERACCIÓN TÁCTIL DEL MAPA
-    // ===============================================================
-    const mapElement = document.getElementById('mapid');
-    let pulsacionMapaId = null;
-    let inicioPulsacionMapa = null;
-    let gestoRotacion = null;
-    let rotacionMapaGrados = 0;
+// INTERACCIÓN TÁCTIL DEL MAPA – selección por pulsación larga
+// (sin rotación, solo selección de edificios)
+// ===============================================================
+const mapElement = document.getElementById('mapid');
+let pulsacionMapaId = null;
+let inicioPulsacionMapa = null;
 
-    function obtenerLatLngDesdeToque(toque) {
-        const rect = mapElement.getBoundingClientRect();
-        return map.containerPointToLatLng(L.point(toque.clientX - rect.left, toque.clientY - rect.top));
-    }
+function obtenerLatLngDesdeToque(toque) {
+    const rect = mapElement.getBoundingClientRect();
+    return map.containerPointToLatLng(L.point(toque.clientX - rect.left, toque.clientY - rect.top));
+}
 
-    function anguloEntreToques(a, b) {
-        return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
-    }
-
-    function seleccionarPuntoCercano(latlng) {
-        let masCercano = null;
-        let menorDistancia = Infinity;
-        edificios.forEach(function(edificio) {
-            const distanciaEdificio = distancia(latlng.lat, latlng.lng, edificio.lat, edificio.lng) * 1000;
-            if (distanciaEdificio < menorDistancia) {
-                menorDistancia = distanciaEdificio;
-                masCercano = edificio;
-            }
-        });
-        if (!masCercano || menorDistancia > 120) {
-            mostrarToastCerca('Mantén presionado cerca de un edificio para seleccionarlo.');
-            return;
+function seleccionarPuntoCercano(latlng) {
+    let masCercano = null;
+    let menorDistancia = Infinity;
+    edificios.forEach(function(edificio) {
+        const distanciaEdificio = distancia(latlng.lat, latlng.lng, edificio.lat, edificio.lng) * 1000;
+        if (distanciaEdificio < menorDistancia) {
+            menorDistancia = distanciaEdificio;
+            masCercano = edificio;
         }
-        select.value = String(masCercano.id);
-        select.dispatchEvent(new Event('change'));
-        mostrarToastCerca('📍 Destino seleccionado: ' + masCercano.nombre.replace(/^↪\s*/, ''));
+    });
+    if (!masCercano || menorDistancia > 120) {
+        mostrarToastCerca('Mantén presionado cerca de un edificio para seleccionarlo.');
+        return;
     }
+    select.value = String(masCercano.id);
+    select.dispatchEvent(new Event('change'));
+    mostrarToastCerca('📍 Destino seleccionado: ' + masCercano.nombre.replace(/^↪\s*/, ''));
+}
 
-    mapElement.addEventListener('touchstart', function(event) {
-        if (event.touches.length === 2) {
-            if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
-            gestoRotacion = {
-                anguloInicial: anguloEntreToques(event.touches[0], event.touches[1]),
-                rotacionInicial: rotacionMapaGrados
-            };
-            return;
-        }
-        if (event.touches.length !== 1) return;
+mapElement.addEventListener('touchstart', function(event) {
+    if (event.touches.length !== 1) return;
+    const toque = event.touches[0];
+    inicioPulsacionMapa = { x: toque.clientX, y: toque.clientY };
+    pulsacionMapaId = setTimeout(function() {
+        seleccionarPuntoCercano(obtenerLatLngDesdeToque(toque));
+        pulsacionMapaId = null;
+    }, 650);
+}, { passive: true });
+
+mapElement.addEventListener('touchmove', function(event) {
+    if (event.touches.length === 1 && inicioPulsacionMapa) {
         const toque = event.touches[0];
-        inicioPulsacionMapa = { x: toque.clientX, y: toque.clientY };
-        pulsacionMapaId = setTimeout(function() {
-            seleccionarPuntoCercano(obtenerLatLngDesdeToque(toque));
-            pulsacionMapaId = null;
-        }, 650);
-    }, { passive: true });
-
-    mapElement.addEventListener('touchmove', function(event) {
-        if (event.touches.length === 1 && inicioPulsacionMapa) {
-            const toque = event.touches[0];
-            const seMovio = Math.hypot(toque.clientX - inicioPulsacionMapa.x, toque.clientY - inicioPulsacionMapa.y);
-            if (seMovio > 12 && pulsacionMapaId) {
-                clearTimeout(pulsacionMapaId);
-                pulsacionMapaId = null;
-            }
-        }
-        if (event.touches.length !== 2 || !gestoRotacion) return;
-        event.preventDefault();
-        const delta = anguloEntreToques(event.touches[0], event.touches[1]) - gestoRotacion.anguloInicial;
-        rotacionMapaGrados = gestoRotacion.rotacionInicial + delta;
-        mapElement.style.transformOrigin = 'center center';
-        mapElement.style.transform = 'rotate(' + rotacionMapaGrados + 'deg)';
-    }, { passive: false });
-
-    mapElement.addEventListener('touchend', function(event) {
-        if (pulsacionMapaId) {
+        const seMovio = Math.hypot(toque.clientX - inicioPulsacionMapa.x, toque.clientY - inicioPulsacionMapa.y);
+        if (seMovio > 12 && pulsacionMapaId) {
             clearTimeout(pulsacionMapaId);
             pulsacionMapaId = null;
         }
-        inicioPulsacionMapa = null;
-        if (event.touches.length < 2) gestoRotacion = null;
-    }, { passive: true });
-    mapElement.addEventListener('touchcancel', function() {
-        if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
-        pulsacionMapaId = null;
-        inicioPulsacionMapa = null;
-        gestoRotacion = null;
-    }, { passive: true });
+    }
+}, { passive: true });
 
+mapElement.addEventListener('touchend', function() {
+    if (pulsacionMapaId) {
+        clearTimeout(pulsacionMapaId);
+        pulsacionMapaId = null;
+    }
+    inicioPulsacionMapa = null;
+}, { passive: true });
+
+mapElement.addEventListener('touchcancel', function() {
+    if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
+    pulsacionMapaId = null;
+    inicioPulsacionMapa = null;
+}, { passive: true });
     // ===============================================================
     // ESTADÍSTICAS: caché local de respaldo + API global de Supabase
     // ===============================================================
@@ -2509,55 +2488,40 @@
         return { lila: coords.slice(0, -1), roja: coords.slice(-2) };
     }
 
-    function dibujarRuta(coords, ajustarVista) {
+   function dibujarRuta(coords, ajustarVista) {
     limpiarCapaRuta();
-    const tramos = dividirRutaPorTramoFinal(coords, 30);
+    if (!coords || coords.length < 2) return;
+
+    // Convertir coordenadas a formato [[lat, lng], ...]
+    const puntos = coords.map(p => [p.lat, p.lng]);
+
     const capasRuta = [];
 
-    if (tramos.lila.length >= 2) {
-        // Convertir coordenadas a formato [[lat, lng], ...]
-        const puntosLila = tramos.lila.map(p => [p.lat, p.lng]);
-        // Línea de borde blanca
-        capasRuta.push(L.polyline(puntosLila, {
-            color: '#ffffff',
-            weight: 10,
-            opacity: 0.98,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-        // Línea lila principal
-        capasRuta.push(L.polyline(puntosLila, {
-            color: '#A855F7',
-            weight: 6,
-            opacity: 1,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-    }
+    // Borde blanco más grueso (ampliado de 10 a 14)
+    capasRuta.push(L.polyline(puntos, {
+        color: '#ffffff',
+        weight: 14,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
 
-    if (tramos.roja.length >= 2) {
-        const puntosRoja = tramos.roja.map(p => [p.lat, p.lng]);
-        capasRuta.push(L.polyline(puntosRoja, {
-            color: '#ffffff',
-            weight: 10,
-            opacity: 0.98,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-        capasRuta.push(L.polyline(puntosRoja, {
-            color: '#F0183D',
-            weight: 6,
-            opacity: 1,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-    }
+    // Línea lila principal (sin rojo al final)
+    capasRuta.push(L.polyline(puntos, {
+        color: '#A855F7',
+        weight: 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
 
-        if (capasRuta.length > 0) {
+    if (capasRuta.length > 0) {
         window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
         if (ajustarVista && coords.length > 1) {
             map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
         }
+    }
+}
     } // cierra if (capasRuta.length > 0)
 } // cierra función dibujarRuta
 function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
@@ -2688,7 +2652,7 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         }
     };
 
-    if (distanciaDirectaMetros <= 100) {
+    if (distanciaDirectaMetros <= 400) {
         statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
