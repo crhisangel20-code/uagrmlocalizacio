@@ -1755,6 +1755,23 @@
     // -------------------------------------------------------------
     // 1. DATOS DE EDIFICIOS
     // -------------------------------------------------------------
+// ===============================================
+// (PROTOTIPO) DATOS HIPOTÉTICOS DE EVENTOS
+// ===============================================
+const eventosDemo = [
+    { id: 1, nombre: "Feria de Emprendimiento", fecha: "22 de Noviembre, 9:00 AM", descripcion: "Muestra de proyectos estudiantiles", edificioId: 21, lat: -17.7756049, lng: -63.1949454 },
+    { id: 2, nombre: "Congreso de Medicina", fecha: "05 de Diciembre, 10:00 AM", descripcion: "Conferencias de actualización", edificioId: 57, lat: -17.7749599, lng: -63.1976638 },
+    { id: 3, nombre: "Torneo Interfacultades", fecha: "15 de Diciembre, 14:00 PM", descripcion: "Campeonato de fútbol y básquet", edificioId: 40, lat: -17.7780142, lng: -63.1955953 }
+];
+
+// ===============================================
+// (PROTOTIPO) DATOS HIPOTÉTICOS DE EMPRENDEDORES
+// ===============================================
+const emprendedoresDemo = [
+    { id: 1, nombre: "María - Repostería", producto: "Tortas y postres artesanales", lat: -17.775300, lng: -63.193500, whatsapp: "https://wa.me/59170000000" },
+    { id: 2, nombre: "Carlos - Ropa", producto: "Ropa deportiva", lat: -17.774500, lng: -63.195200, whatsapp: "https://wa.me/59171111111" },
+    { id: 3, nombre: "Lucía - Artesanías", producto: "Pulseras y collares", lat: -17.776000, lng: -63.196500, whatsapp: "https://wa.me/59172222222" }
+];
     const edificios = [
         { id: 1, nombre: "Ciudad Universitaria", lat: -17.775488, lng: -63.19373 },
         { id: 9, nombre: "↪ Cancha Polifuncional", lat: -17.7741408, lng: -63.1937158 },
@@ -1771,7 +1788,7 @@
         { id: 18, nombre: "↪ Módulo 222 - Aulas", lat: -17.7742182, lng: -63.1947392 },
         { id: 19, nombre: "↪ Módulo 223 - Snack", lat: -17.7748164, lng: -63.1944736 },
         { id: 20, nombre: "↪ Módulo 224 - Tecnología", lat: -17.7754529, lng: -63.1944685 },
-        { id: 21, nombre: "↪ Módulo 225 - Facultad de Ciencias Exactas y Tecnología", lat: -17.7756049, lng: -63.1949454 },
+        { id: 21, nombre: "↪ Módulo 225 - Facultad de Ciencias Exactas y Tecnología", lat: -17.7756049, lng: -63.1949454, redes: { facebook: "https://facebook.com/facultaddetecnologiauagrm", instagram: "https://instagram.com/facultaddetecnologiauagrm" } },        
         { id: 22, nombre: "↪ Módulo 226 - Cancha Polifuncional", lat: -17.7762949, lng: -63.1947181 },
         { id: 23, nombre: "↪ Módulo 228 - Edif. Central Facultad de Veterinaria", lat: -17.7768097, lng: -63.1948632 },
         { id: 24, nombre: "↪ Módulo 229 - Biblioteca Veterinaria", lat: -17.7770957, lng: -63.1944429 },
@@ -1808,7 +1825,7 @@
         { id: 54, nombre: "↪ Módulo 264 - Fac. Cs. Económicas", lat: -17.7764367, lng: -63.1969474 },
         { id: 55, nombre: "↪ Módulo 265 - Fac. Cs. Económicas", lat: -17.7767357, lng: -63.1966756 },
         { id: 56, nombre: "↪ Módulo 270 - Coliseo Deportivo", lat: -17.7736789, lng: -63.1975340 },
-        { id: 57, nombre: "↪ Módulo 272 - Fac. Cs. de la Salud Humana", lat: -17.7749599, lng: -63.1976638 },
+        { id: 57, nombre: "↪ Módulo 272 - Fac. Cs. de la Salud Humana", lat: -17.7749599, lng: -63.1976638, redes: { facebook: "https://facebook.com/medicina.uagrm", instagram: "https://instagram.com/medicina.uagrm" } },
         { id: 58, nombre: "↪ Módulo 273 - Estacionamiento Vertical y Cancha Polifuncional", lat: -17.7765467, lng: -63.1973747 },
         { id: 59, nombre: "↪ Módulo 274 - Canal 11 Televisión Universitaria", lat: -17.7774150, lng: -63.1976100 },
         { id: 60, nombre: "↪ Módulo 280 - Fac. Cs. de la Salud Humana", lat: -17.7746590, lng: -63.1979140 },
@@ -1904,11 +1921,55 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
     // Marcadores
     const markers = {};
+// ===============================================
+// MOSTRAR EMPRENDEDORES EN EL MAPA (PROTOTIPO)
+// ===============================================
+emprendedoresDemo.forEach(emp => {
+    const iconoEmprendedor = L.divIcon({
+        className: '',
+        html: `<div style="background:#6B4C9A; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:16px; border:3px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.4);">🛍️</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15]
+    });
+
+    const markerEmprendedor = L.marker([emp.lat, emp.lng], { icon: iconoEmprendedor }).addTo(map);
+    
+    markerEmprendedor.bindPopup(`
+        <strong>🛍️ ${emp.nombre}</strong><br>
+        <em>${emp.producto}</em><br><br>
+        <a href="${emp.whatsapp}" target="_blank" style="background:#25D366; color:white; padding:8px 12px; text-decoration:none; border-radius:5px; font-weight:bold;">📱 Pedir por WhatsApp</a>
+        <br><br><button onclick="irAEvento(${emp.lat}, ${emp.lng}, 'Emprendedor: ${emp.nombre}')" style="background:#3E7CB1; color:white; border:none; padding:5px 8px; border-radius:5px; cursor:pointer;">📍 Cómo llegar</button>
+    `);
+});
     edificios.forEach(ed => {
         const cat = categorizar(ed.nombre);
         const esSede = cat === 'sede';
         const c = CATEGORIAS[cat];
-        const popupContent = `<strong>${ed.nombre}</strong><br><span class="categoria-tag" style="background:${c.color};">${c.icon} ${c.label}</span>`;
+         // Buscar eventos para este edificio
+        const eventosDeEsteEdificio = eventosDemo.filter(ev => ev.edificioId === ed.id);
+        let eventosHTML = '';
+        if (eventosDeEsteEdificio.length > 0) {
+            eventosDeEsteEdificio.forEach(ev => {
+                eventosHTML += `<div style="margin-top:8px; border-top:1px solid #eee; padding-top:6px;">
+                    <strong>📅 ${ev.nombre}</strong><br>
+                    🕐 ${ev.fecha}<br>
+                    ${ev.descripcion}<br>
+                    <button onclick="irAEvento(${ev.lat}, ${ev.lng}, '${ev.nombre}')" style="background:#D9A441; color:#000; border:none; padding:5px 8px; border-radius:5px; margin-top:4px; cursor:pointer;">📍 Cómo llegar</button>
+                </div>`;
+            });
+        }
+
+        // Añadir redes sociales al popup
+        let redesHTML = '';
+        if (ed.redes) {
+            redesHTML += `<div style="margin-top:8px; border-top:1px solid #eee; padding-top:6px;"><strong>Redes:</strong><br>`;
+            if (ed.redes.facebook) redesHTML += `<a href="${ed.redes.facebook}" target="_blank" style="margin-right:5px;">📘 Facebook</a>`;
+            if (ed.redes.instagram) redesHTML += `<a href="${ed.redes.instagram}" target="_blank">📸 Instagram</a>`;
+            redesHTML += `</div>`;
+        }
+        
+        const popupContent = `<strong>${ed.nombre}</strong><br><span class="categoria-tag" style="background:${c.color};">${c.icon} ${c.label}</span>${eventosHTML}${redesHTML}`;
         const marker = L.marker([ed.lat, ed.lng], { icon: crearIcono(cat, esSede) })
             .addTo(map)
             .bindPopup(popupContent);
@@ -1932,7 +1993,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         item.innerHTML = `<span class="leyenda-dot" style="background:${c.color};"></span>${c.icon} ${c.label}`;
         leyendaEl.appendChild(item);
     });
-
+// Función para ir a un evento o emprendedor desde el GPS
+function irAEvento(lat, lng, nombreDestino) {
+    const destinoEvento = { nombre: nombreDestino, lat: lat, lng: lng };
+    
+    if (!userLocation) {
+        alert('Primero presiona "📍 Mi ubicación (GPS)" para calcular tu ruta.');
+        return;
+    }
+    planificarRuta(userLocation, destinoEvento);
+}
     // -------------------------------------------------------------
     // 4. SELECTOR DE EDIFICIOS
     // -------------------------------------------------------------
