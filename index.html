@@ -1979,11 +1979,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
    // ===============================================================
 // ===============================================================
 // PASO 5: Función para resetear la rotación al Norte
-// ===============================================================
 function resetRotacionMapa() {
-    // Usamos el plugin leaflet-rotate que ya cargaste en el <head>
-    map.setBearing(0, { animate: true });
-    console.log('🔄 Mapa rotado de vuelta al Norte (0°)');
+    // Intentamos rotar suavemente si el plugin está activo, si no, no hacemos nada para no dar error
+    if (typeof map.setBearing === 'function') {
+        map.setBearing(0, { animate: true });
+        console.log('🔄 Mapa rotado de vuelta al Norte (0°)');
+    } else {
+        console.warn('El plugin de rotación no cargó. Solo se vuelve a centrar el mapa.');
+        // Alternativa segura: volver a centrar el mapa sin rotar
+        map.setView(map.getCenter(), map.getZoom(), { animate: true });
+    }
 }
 // ===============================================================
 // PASO 6: HEADING - Botón de brújula para volver al Norte
