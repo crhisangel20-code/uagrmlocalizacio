@@ -1897,11 +1897,10 @@
 const maptilerKey = 'uuO75vatnFPQY1HAWlqI'; // <-- Cambia esto por tu clave real
 
 // Si no tienes clave, puedes probar con OpenMapTiles (sin registro):
-// const glLayer = L.mapboxGL({ style: 'https://tiles.openfreemap.org/styles/liberty.json' }).addTo(map);
-
-const glLayer = L.mapboxGL({
-    
-    style: `https://api.maptiler.com/maps/01a06532-37b2-7770-b79b-1eca25d5a88c/style.json?key=uuO75vatnFPQY1HAWlqI`
+// Capa de fondo clásica (OpenStreetMap) que siempre funciona
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20,
+    attribution: '© OpenStreetMap'
 }).addTo(map);
     // Marcadores
     const markers = {};
