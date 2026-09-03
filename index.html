@@ -18,6 +18,9 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet Rotate plugin (para que gire como Google Maps) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-rotate/dist/leaflet-rotate.css" />
+<script src="https://unpkg.com/leaflet-rotate/dist/leaflet-rotate.min.js"></script>
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 <!-- Leaflet JS (NECESARIO) -->
@@ -1881,7 +1884,12 @@
     // -------------------------------------------------------------
     // 3. MAPA Y CAPAS
     // -------------------------------------------------------------
-    const map = L.map('mapid').setView([-17.78, -63.18], 12);
+   const map = L.map('mapid', {
+    center: [-17.78, -63.18],
+    zoom: 12,
+    rotate: true,      // <--- Activa la rotación suave
+    bearing: 0         // <--- Apunta al Norte
+});
 
     // ===============================================================
 // PASO FINAL: MAPA VECTORIAL CON MAPTILER (WebGL + 3D)
@@ -1892,7 +1900,7 @@ const maptilerKey = 'uuO75vatnFPQY1HAWlqI'; // <-- Cambia esto por tu clave real
 // const glLayer = L.mapboxGL({ style: 'https://tiles.openfreemap.org/styles/liberty.json' }).addTo(map);
 
 const glLayer = L.mapboxGL({
-    accessToken: maptilerKey,
+    
     style: `https://api.maptiler.com/maps/01a06532-37b2-7770-b79b-1eca25d5a88c/style.json?key=uuO75vatnFPQY1HAWlqI`
 }).addTo(map);
     // Marcadores
@@ -1970,195 +1978,14 @@ const glLayer = L.mapboxGL({
     // ===============================================================
     // INTERACCIÓN TÁCTIL DEL MAPA
    // ===============================================================
-// PASO 3, 4, 5 y 7: ROTACIÓN + GESTOS + INERCIA + TILT (INCLINACIÓN)
 // ===============================================================
-(function() {
-    const mapElement = document.getElementById('mapid');
-    const mapPane = document.querySelector('#mapid .leaflet-map-pane');
-    let rotacionMapaGrados = 0;
-    let tiltMapaGrados = 0;          // Nuevo: inclinación en grados (0 = vertical, 60 = máximo)
-    let gestoRotacion = null;
-    let velocidadAngular = 0;
-    let ultimoAngulo = null;
-    let ultimoTiempo = null;
-    let animacionInercia = null;
-    let centroYInicial = null;       // Para detectar deslizamiento vertical (tilt)
-
-    const TILT_MIN = 0;
-    const TILT_MAX = 60;
-
-    function anguloEntreDedos(t1, t2) {
-        return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-    }
-
-    // Aplicar rotación e inclinación simultáneamente
-    function actualizarTransformacion() {
-        if (mapPane) {
-            mapPane.style.transformOrigin = 'center center';
-            mapPane.style.transform = 
-                `rotate(${rotacionMapaGrados}deg) perspective(800px) rotateX(${tiltMapaGrados}deg)`;
-        }
-    }
-
-    // --- INICIO DEL GESTO (dos dedos tocan la pantalla) ---
-    mapElement.addEventListener('touchstart', function(e) {
-        if (e.touches.length === 2) {
-            if (animacionInercia) {
-                cancelAnimationFrame(animacionInercia);
-                animacionInercia = null;
-            }
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            gestoRotacion = {
-                anguloInicial: anguloEntreDedos(t1, t2),
-                distanciaInicial: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
-                rotacionInicial: rotacionMapaGrados,
-                tiltInicial: tiltMapaGrados,
-                centroYInicial: (t1.clientY + t2.clientY) / 2,
-                modo: null
-            };
-            ultimoAngulo = gestoRotacion.anguloInicial;
-            ultimoTiempo = Date.now();
-            velocidadAngular = 0;
-            centroYInicial = (t1.clientY + t2.clientY) / 2;
-        }
-    }, { passive: true });
-
-    // --- MOVIMIENTO DE LOS DEDOS (girando, haciendo zoom o inclinando) ---
-    mapElement.addEventListener('touchmove', function(e) {
-        if (e.touches.length === 2 && gestoRotacion) {
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            const ahora = Date.now();
-            
-            const anguloActual = anguloEntreDedos(t1, t2);
-            const distanciaActual = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            const centroYActual = (t1.clientY + t2.clientY) / 2;
-            
-            const deltaAngulo = anguloActual - gestoRotacion.anguloInicial;
-            const deltaDistancia = distanciaActual - gestoRotacion.distanciaInicial;
-            const deltaY = (centroYActual - gestoRotacion.centroYInicial) * 0.3; // sensibilidad del tilt
-
-            // --- DECIDIR MODO: Rotación, Zoom o Tilt ---
-            if (gestoRotacion.modo === null) {
-                const umbralAngulo = 0.08;
-                const umbralDistancia = 8;
-                const umbralY = 8;
-                
-                const esRotacion = Math.abs(deltaAngulo) > umbralAngulo;
-                const esZoom = Math.abs(deltaDistancia) > umbralDistancia;
-                const esTilt = Math.abs(deltaY) > umbralY;
-
-                // Priorizar según magnitud
-                if (esRotacion && !esZoom && !esTilt) {
-                    gestoRotacion.modo = 'rotate';
-                } else if (esZoom && !esRotacion && !esTilt) {
-                    gestoRotacion.modo = 'zoom';
-                } else if (esTilt && !esRotacion && !esZoom) {
-                    gestoRotacion.modo = 'tilt';
-                } else if (esRotacion && esTilt) {
-                    // Si ambos son significativos, comparar
-                    const cambioAngulo = Math.abs(deltaAngulo) * 50;
-                    const cambioY = Math.abs(deltaY);
-                    gestoRotacion.modo = cambioAngulo > cambioY ? 'rotate' : 'tilt';
-                } else {
-                    // Si hay múltiples, decidir por el más evidente
-                    gestoRotacion.modo = 'rotate'; // por defecto
-                }
-            }
-
-            // --- EJECUTAR SEGÚN MODO ---
-            if (gestoRotacion.modo === 'rotate') {
-                e.preventDefault(); // Bloquear zoom mientras rotamos
-                
-                // Velocidad angular para inercia
-                if (ultimoAngulo !== null && ultimoTiempo !== null) {
-                    const dt = (ahora - ultimoTiempo) / 1000;
-                    if (dt > 0.01) {
-                        velocidadAngular = (anguloActual - ultimoAngulo) / dt;
-                    }
-                }
-                ultimoAngulo = anguloActual;
-                ultimoTiempo = ahora;
-
-                rotacionMapaGrados = gestoRotacion.rotacionInicial + (deltaAngulo * 180 / Math.PI);
-                actualizarTransformacion();
-            } 
-            else if (gestoRotacion.modo === 'tilt') {
-                e.preventDefault(); // Bloquear zoom mientras inclinamos
-                // Ajustar inclinación (tilt)
-                let nuevoTilt = gestoRotacion.tiltInicial + deltaY;
-                nuevoTilt = Math.min(TILT_MAX, Math.max(TILT_MIN, nuevoTilt));
-                tiltMapaGrados = nuevoTilt;
-                actualizarTransformacion();
-            }
-            // Si modo === 'zoom', no hacemos nada, Leaflet maneja el zoom naturalmente
-        }
-    }, { passive: false });
-
-    // --- FIN DEL GESTO + INERCIA (solo para rotación) ---
-    mapElement.addEventListener('touchend', function(e) {
-        if (e.touches.length < 2) {
-            if (gestoRotacion && gestoRotacion.modo === 'rotate' && Math.abs(velocidadAngular) > 0.005) {
-                iniciarInercia(velocidadAngular);
-            }
-            gestoRotacion = null;
-            ultimoAngulo = null;
-            ultimoTiempo = null;
-            centroYInicial = null;
-        }
-    }, { passive: true });
-
-    // --- FUNCIÓN DE INERCIA (igual que antes) ---
-    function iniciarInercia(velocidadInicial) {
-        const DECELERACION = 0.96;
-        const VELOCIDAD_MINIMA = 0.001;
-        let vel = velocidadInicial;
-        let ultimoFrame = performance.now();
-
-        function pasoInercia() {
-            const ahora = performance.now();
-            const dt = Math.min((ahora - ultimoFrame) / 16, 1.5);
-            ultimoFrame = ahora;
-
-            const deltaGrados = vel * dt * 20;
-            rotacionMapaGrados += deltaGrados;
-            actualizarTransformacion();
-
-            vel *= DECELERACION;
-            if (Math.abs(vel) > VELOCIDAD_MINIMA) {
-                animacionInercia = requestAnimationFrame(pasoInercia);
-            } else {
-                animacionInercia = null;
-                // Ajuste final
-                rotacionMapaGrados = Math.round(rotacionMapaGrados);
-                actualizarTransformacion();
-            }
-        }
-        if (animacionInercia) cancelAnimationFrame(animacionInercia);
-        animacionInercia = requestAnimationFrame(pasoInercia);
-    }
-
-    // --- FUNCIÓN PARA RESETEAR ROTACIÓN Y TILT (usada por el botón de brújula) ---
-    window.resetRotacionMapa = function() {
-        if (animacionInercia) {
-            cancelAnimationFrame(animacionInercia);
-            animacionInercia = null;
-        }
-        rotacionMapaGrados = 0;
-        tiltMapaGrados = 0;
-        velocidadAngular = 0;
-        if (mapPane) {
-            mapPane.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
-            actualizarTransformacion();
-            setTimeout(function() {
-                mapPane.style.transition = '';
-            }, 600);
-        }
-    };
-
-    console.log('✅ PASO 7: Tilt (inclinación) activado. Desliza dos dedos verticalmente para inclinar el mapa.');
-})();
+// PASO 5: Función para resetear la rotación al Norte
+// ===============================================================
+function resetRotacionMapa() {
+    // Usamos el plugin leaflet-rotate que ya cargaste en el <head>
+    map.setBearing(0, { animate: true });
+    console.log('🔄 Mapa rotado de vuelta al Norte (0°)');
+}
 // ===============================================================
 // PASO 6: HEADING - Botón de brújula para volver al Norte
 // ===============================================================
