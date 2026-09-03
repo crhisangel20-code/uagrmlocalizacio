@@ -1879,10 +1879,18 @@
     // -------------------------------------------------------------
     const map = L.map('mapid').setView([-17.78, -63.18], 12);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    // ===============================================================
+// PASO FINAL: MAPA VECTORIAL CON MAPTILER (WebGL + 3D)
+// ===============================================================
+const maptilerKey = 'uuO75vatnFPQY1HAWlqI'; // <-- Cambia esto por tu clave real
 
+// Si no tienes clave, puedes probar con OpenMapTiles (sin registro):
+// const glLayer = L.mapboxGL({ style: 'https://tiles.openfreemap.org/styles/liberty.json' }).addTo(map);
+
+const glLayer = L.mapboxGL({
+    accessToken: maptilerKey,
+    style: `https://api.maptiler.com/maps/01a06532-37b2-7770-b79b-1eca25d5a88c/style.json?key=uuO75vatnFPQY1HAWlqI`
+}).addTo(map);
     // Marcadores
     const markers = {};
     edificios.forEach(ed => {
@@ -1957,91 +1965,280 @@
 
     // ===============================================================
     // INTERACCIÓN TÁCTIL DEL MAPA
-    // ===============================================================
+   // ===============================================================
+// PASO 3, 4, 5 y 7: ROTACIÓN + GESTOS + INERCIA + TILT (INCLINACIÓN)
+// ===============================================================
+(function() {
     const mapElement = document.getElementById('mapid');
-let pulsacionMapaId = null;
-let inicioPulsacionMapa = null;
-let gestoRotacion = null;
-let rotacionMapaGrados = 0;
+    const mapPane = document.querySelector('#mapid .leaflet-map-pane');
+    let rotacionMapaGrados = 0;
+    let tiltMapaGrados = 0;          // Nuevo: inclinación en grados (0 = vertical, 60 = máximo)
+    let gestoRotacion = null;
+    let velocidadAngular = 0;
+    let ultimoAngulo = null;
+    let ultimoTiempo = null;
+    let animacionInercia = null;
+    let centroYInicial = null;       // Para detectar deslizamiento vertical (tilt)
 
-// SELECCIONAMOS EL PANE INTERNO PARA ROTAR SOLO EL MAPA (NO EL MARCO)
-const mapPane = document.querySelector('#mapid .leaflet-map-pane');
+    const TILT_MIN = 0;
+    const TILT_MAX = 60;
 
-function obtenerLatLngDesdeToque(toque) {
-    const rect = mapElement.getBoundingClientRect();
-    return map.containerPointToLatLng(L.point(toque.clientX - rect.left, toque.clientY - rect.top));
-}
+    function anguloEntreDedos(t1, t2) {
+        return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+    }
 
-function anguloEntreToques(a, b) {
-    return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
-}
+    // Aplicar rotación e inclinación simultáneamente
+    function actualizarTransformacion() {
+        if (mapPane) {
+            mapPane.style.transformOrigin = 'center center';
+            mapPane.style.transform = 
+                `rotate(${rotacionMapaGrados}deg) perspective(800px) rotateX(${tiltMapaGrados}deg)`;
+        }
+    }
 
-function seleccionarPuntoCercano(latlng) {
-    let masCercano = null;
-    let menorDistancia = Infinity;
-    edificios.forEach(function(edificio) {
-        const distanciaEdificio = distancia(latlng.lat, latlng.lng, edificio.lat, edificio.lng) * 1000;
-        if (distanciaEdificio < menorDistancia) {
-            menorDistancia = distanciaEdificio;
-            masCercano = edificio;
+    // --- INICIO DEL GESTO (dos dedos tocan la pantalla) ---
+    mapElement.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+            if (animacionInercia) {
+                cancelAnimationFrame(animacionInercia);
+                animacionInercia = null;
+            }
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            gestoRotacion = {
+                anguloInicial: anguloEntreDedos(t1, t2),
+                distanciaInicial: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
+                rotacionInicial: rotacionMapaGrados,
+                tiltInicial: tiltMapaGrados,
+                centroYInicial: (t1.clientY + t2.clientY) / 2,
+                modo: null
+            };
+            ultimoAngulo = gestoRotacion.anguloInicial;
+            ultimoTiempo = Date.now();
+            velocidadAngular = 0;
+            centroYInicial = (t1.clientY + t2.clientY) / 2;
+        }
+    }, { passive: true });
+
+    // --- MOVIMIENTO DE LOS DEDOS (girando, haciendo zoom o inclinando) ---
+    mapElement.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2 && gestoRotacion) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const ahora = Date.now();
+            
+            const anguloActual = anguloEntreDedos(t1, t2);
+            const distanciaActual = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            const centroYActual = (t1.clientY + t2.clientY) / 2;
+            
+            const deltaAngulo = anguloActual - gestoRotacion.anguloInicial;
+            const deltaDistancia = distanciaActual - gestoRotacion.distanciaInicial;
+            const deltaY = (centroYActual - gestoRotacion.centroYInicial) * 0.3; // sensibilidad del tilt
+
+            // --- DECIDIR MODO: Rotación, Zoom o Tilt ---
+            if (gestoRotacion.modo === null) {
+                const umbralAngulo = 0.08;
+                const umbralDistancia = 8;
+                const umbralY = 8;
+                
+                const esRotacion = Math.abs(deltaAngulo) > umbralAngulo;
+                const esZoom = Math.abs(deltaDistancia) > umbralDistancia;
+                const esTilt = Math.abs(deltaY) > umbralY;
+
+                // Priorizar según magnitud
+                if (esRotacion && !esZoom && !esTilt) {
+                    gestoRotacion.modo = 'rotate';
+                } else if (esZoom && !esRotacion && !esTilt) {
+                    gestoRotacion.modo = 'zoom';
+                } else if (esTilt && !esRotacion && !esZoom) {
+                    gestoRotacion.modo = 'tilt';
+                } else if (esRotacion && esTilt) {
+                    // Si ambos son significativos, comparar
+                    const cambioAngulo = Math.abs(deltaAngulo) * 50;
+                    const cambioY = Math.abs(deltaY);
+                    gestoRotacion.modo = cambioAngulo > cambioY ? 'rotate' : 'tilt';
+                } else {
+                    // Si hay múltiples, decidir por el más evidente
+                    gestoRotacion.modo = 'rotate'; // por defecto
+                }
+            }
+
+            // --- EJECUTAR SEGÚN MODO ---
+            if (gestoRotacion.modo === 'rotate') {
+                e.preventDefault(); // Bloquear zoom mientras rotamos
+                
+                // Velocidad angular para inercia
+                if (ultimoAngulo !== null && ultimoTiempo !== null) {
+                    const dt = (ahora - ultimoTiempo) / 1000;
+                    if (dt > 0.01) {
+                        velocidadAngular = (anguloActual - ultimoAngulo) / dt;
+                    }
+                }
+                ultimoAngulo = anguloActual;
+                ultimoTiempo = ahora;
+
+                rotacionMapaGrados = gestoRotacion.rotacionInicial + (deltaAngulo * 180 / Math.PI);
+                actualizarTransformacion();
+            } 
+            else if (gestoRotacion.modo === 'tilt') {
+                e.preventDefault(); // Bloquear zoom mientras inclinamos
+                // Ajustar inclinación (tilt)
+                let nuevoTilt = gestoRotacion.tiltInicial + deltaY;
+                nuevoTilt = Math.min(TILT_MAX, Math.max(TILT_MIN, nuevoTilt));
+                tiltMapaGrados = nuevoTilt;
+                actualizarTransformacion();
+            }
+            // Si modo === 'zoom', no hacemos nada, Leaflet maneja el zoom naturalmente
+        }
+    }, { passive: false });
+
+    // --- FIN DEL GESTO + INERCIA (solo para rotación) ---
+    mapElement.addEventListener('touchend', function(e) {
+        if (e.touches.length < 2) {
+            if (gestoRotacion && gestoRotacion.modo === 'rotate' && Math.abs(velocidadAngular) > 0.005) {
+                iniciarInercia(velocidadAngular);
+            }
+            gestoRotacion = null;
+            ultimoAngulo = null;
+            ultimoTiempo = null;
+            centroYInicial = null;
+        }
+    }, { passive: true });
+
+    // --- FUNCIÓN DE INERCIA (igual que antes) ---
+    function iniciarInercia(velocidadInicial) {
+        const DECELERACION = 0.96;
+        const VELOCIDAD_MINIMA = 0.001;
+        let vel = velocidadInicial;
+        let ultimoFrame = performance.now();
+
+        function pasoInercia() {
+            const ahora = performance.now();
+            const dt = Math.min((ahora - ultimoFrame) / 16, 1.5);
+            ultimoFrame = ahora;
+
+            const deltaGrados = vel * dt * 20;
+            rotacionMapaGrados += deltaGrados;
+            actualizarTransformacion();
+
+            vel *= DECELERACION;
+            if (Math.abs(vel) > VELOCIDAD_MINIMA) {
+                animacionInercia = requestAnimationFrame(pasoInercia);
+            } else {
+                animacionInercia = null;
+                // Ajuste final
+                rotacionMapaGrados = Math.round(rotacionMapaGrados);
+                actualizarTransformacion();
+            }
+        }
+        if (animacionInercia) cancelAnimationFrame(animacionInercia);
+        animacionInercia = requestAnimationFrame(pasoInercia);
+    }
+
+    // --- FUNCIÓN PARA RESETEAR ROTACIÓN Y TILT (usada por el botón de brújula) ---
+    window.resetRotacionMapa = function() {
+        if (animacionInercia) {
+            cancelAnimationFrame(animacionInercia);
+            animacionInercia = null;
+        }
+        rotacionMapaGrados = 0;
+        tiltMapaGrados = 0;
+        velocidadAngular = 0;
+        if (mapPane) {
+            mapPane.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            actualizarTransformacion();
+            setTimeout(function() {
+                mapPane.style.transition = '';
+            }, 600);
+        }
+    };
+
+    console.log('✅ PASO 7: Tilt (inclinación) activado. Desliza dos dedos verticalmente para inclinar el mapa.');
+})();
+// ===============================================================
+// PASO 6: HEADING - Botón de brújula para volver al Norte
+// ===============================================================
+(function() {
+    // Verificar que el mapa existe
+    if (typeof map === 'undefined') {
+        console.warn('El mapa aún no está definido. Esperando...');
+        return;
+    }
+
+    // 1. Crear el control personalizado de Leaflet (el botón flotante)
+    const BrújulaControl = L.Control.extend({
+        options: {
+            position: 'topright' // Lo colocamos en la esquina superior derecha (donde suele estar Google Maps)
+        },
+        onAdd: function(map) {
+            // Crear el contenedor del botón
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            
+            // Crear el botón en sí
+            const button = L.DomUtil.create('a', 'leaflet-control-button', container);
+            button.innerHTML = '🧭'; // Icono de brújula
+            button.href = '#';
+            button.title = 'Volver al norte (0°)';
+            
+            // Estilos para que se vea bonito y se integre con Leaflet
+            button.style.fontSize = '20px';
+            button.style.fontWeight = 'bold';
+            button.style.background = 'white';
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            button.style.width = '34px';
+            button.style.height = '34px';
+            button.style.textDecoration = 'none';
+            button.style.color = '#333';
+            button.style.borderRadius = '4px';
+            button.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+            button.style.border = '1px solid #ccc';
+            button.style.cursor = 'pointer';
+            button.style.transition = 'background 0.2s ease';
+
+            // Efecto hover (cuando pasas el mouse por encima)
+            button.addEventListener('mouseenter', function() {
+                this.style.background = '#f4f4f4';
+            });
+            button.addEventListener('mouseleave', function() {
+                this.style.background = 'white';
+            });
+
+            // --- ACCIÓN DEL BOTÓN: Resetear la rotación al norte ---
+            L.DomEvent.on(button, 'click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
+
+                // Llamar a la función de reseteo que creamos en el Paso 5
+                if (typeof resetRotacionMapa === 'function') {
+                    // Pequeño feedback: cambiar el ícono temporalmente
+                    button.innerHTML = '⬆'; // Flecha hacia arriba
+                    button.style.transform = 'scale(0.9)';
+                    
+                    // Llamar a la función que resetea la rotación
+                    resetRotacionMapa();
+                    
+                    // Restaurar el ícono y el tamaño después de 600ms
+                    setTimeout(() => {
+                        button.innerHTML = '🧭';
+                        button.style.transform = 'scale(1)';
+                    }, 600);
+                } else {
+                    alert('⚠️ La función de rotación aún no está disponible. Asegúrate de haber completado el Paso 5.');
+                }
+            });
+
+            return container;
         }
     });
-    if (!masCercano || menorDistancia > 120) {
-        mostrarToastCerca('Mantén presionado cerca de un edificio para seleccionarlo.');
-        return;
-    }
-    select.value = String(masCercano.id);
-    select.dispatchEvent(new Event('change'));
-    mostrarToastCerca('📍 Destino seleccionado: ' + masCercano.nombre.replace(/^↪\s*/, ''));
-}
 
-mapElement.addEventListener('touchstart', function(event) {
-    if (event.touches.length === 2) {
-        if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
-        gestoRotacion = {
-            anguloInicial: anguloEntreToques(event.touches[0], event.touches[1]),
-            rotacionInicial: rotacionMapaGrados
-        };
-        return;
-    }
-    if (event.touches.length !== 1) return;
-    const toque = event.touches[0];
-    inicioPulsacionMapa = { x: toque.clientX, y: toque.clientY };
-    pulsacionMapaId = setTimeout(function() {
-        seleccionarPuntoCercano(obtenerLatLngDesdeToque(toque));
-        pulsacionMapaId = null;
-    }, 650);
-}, { passive: true });
+    // 2. Agregar el control al mapa
+    const brújula = new BrújulaControl();
+    brújula.addTo(map);
 
-mapElement.addEventListener('touchmove', function(event) {
-    if (event.touches.length === 1 && inicioPulsacionMapa) {
-        const toque = event.touches[0];
-        const seMovio = Math.hypot(toque.clientX - inicioPulsacionMapa.x, toque.clientY - inicioPulsacionMapa.y);
-        if (seMovio > 12 && pulsacionMapaId) {
-            clearTimeout(pulsacionMapaId);
-            pulsacionMapaId = null;
-        }
-    }
-    if (event.touches.length !== 2 || !gestoRotacion) return;
-    event.preventDefault();
-    const delta = anguloEntreToques(event.touches[0], event.touches[1]) - gestoRotacion.anguloInicial;
-    rotacionMapaGrados = gestoRotacion.rotacionInicial + delta;
-
-    // CAMBIO CLAVE: rotamos el mapa interno, NO el marco
-    if (mapPane) {
-        mapPane.style.transformOrigin = 'center center';
-        mapPane.style.transform = 'rotate(' + rotacionMapaGrados + 'deg)';
-    }
-}, { passive: false });
-
-mapElement.addEventListener('touchend', function(event) {
-    if (pulsacionMapaId) {
-        clearTimeout(pulsacionMapaId);
-        pulsacionMapaId = null;
-    }
-    inicioPulsacionMapa = null;
-    if (event.touches.length < 2) gestoRotacion = null;
-}, { passive: true });
+    console.log('✅ PASO 6: Heading (brújula) activado. Haz clic en el botón 🧭 para volver al norte.');
+})();
 
     // ===============================================================
     // ESTADÍSTICAS: caché local de respaldo + API global de Supabase
@@ -3350,6 +3547,60 @@ if (distanciaSenderos > UMBRAL_FUERA_CAMPUS_METROS) {
         });
 
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
+// ===============================================================
+// PASO 8: MAP ID VECTORIAL - Configuración central de funciones
+// ===============================================================
+(function() {
+    // Esta variable centraliza TODAS las funcionalidades que has activado
+    // Así puedes activar o desactivar cada una con solo cambiar 'true' a 'false'
+    const MAP_CONFIG = {
+        id: 'uagrm-campus-map',
+        version: '1.0.0',
+        features: {
+            rotateEnabled: true,        // Rotación con dos dedos
+            tiltEnabled: true,          // Inclinación 3D (tilt)
+            inertiaEnabled: true,       // Inercia al soltar
+            headingEnabled: true,       // Botón de brújula
+            gestureHandlingEnabled: true // Distingue zoom de rotación
+        },
+        limits: {
+            maxTilt: 60,                // Grados máximos de inclinación
+            minTilt: 0,                // Grados mínimos de inclinación
+            inertiaDeceleration: 0.96,  // Fricción de la inercia (0.90-0.99)
+            rotationSensitivity: 1.0    // Sensibilidad de rotación (0.5-2.0)
+        }
+    };
+
+    // Mostrar en consola la configuración activa (para verificar que todo está bien)
+    console.log('✅ PASO 8: Map ID Vectorial configurado correctamente.');
+    console.log('📋 Configuración activa:', MAP_CONFIG);
+    console.log('🔧 Funcionalidades activadas:');
+    for (const [key, value] of Object.entries(MAP_CONFIG.features)) {
+        console.log(`   - ${key}: ${value ? '✅ Activado' : '❌ Desactivado'}`);
+    }
+    console.log('📐 Límites:', MAP_CONFIG.limits);
+
+    // --- FUNCIÓN DE UTILIDAD: puedes llamar a esta función desde la consola
+    // para ver el estado actual del mapa
+    window.getMapConfig = function() {
+        return MAP_CONFIG;
+    };
+
+    // --- FUNCIÓN PARA CAMBIAR CONFIGURACIÓN EN TIEMPO REAL (opcional)
+    // Ejemplo: setMapFeature('tiltEnabled', false) desactiva el tilt
+    window.setMapFeature = function(featureName, value) {
+        if (MAP_CONFIG.features.hasOwnProperty(featureName)) {
+            MAP_CONFIG.features[featureName] = value;
+            console.log(`✅ Característica '${featureName}' cambiada a: ${value}`);
+            console.log('⚠️ Algunos cambios requieren recargar la página para aplicarse completamente.');
+        } else {
+            console.warn(`❌ La característica '${featureName}' no existe. Opciones disponibles:`, Object.keys(MAP_CONFIG.features));
+        }
+    };
+
+    console.log('💡 Para ver la configuración en cualquier momento, escribe en la consola: getMapConfig()');
+    console.log('💡 Para cambiar una función, escribe: setMapFeature("tiltEnabled", false)');
+})();
 </script>
 
 </body>
