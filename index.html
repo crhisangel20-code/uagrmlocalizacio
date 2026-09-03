@@ -2217,7 +2217,7 @@ function resetRotacionMapa() {
 })();
 
     // ===============================================================
-// ESTADÍSTICAS GLOBALES CON SUPABASE (Nuevo)
+// ESTADÍSTICAS GLOBALES CON SUPABASE (Corregido - Sin error 400)
 // ===============================================================
 const SUPABASE_URL = 'https://yvnxhnkapamcavmiaxmb.supabase.co/rest/v1/';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bnhobmthcGFtY2F2bWlheG1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMjk1NDMsImV4cCI6MjEwMzgwNTU0M30.bRhjxGbC1xbU-XvWoGSKktULiyJdph3jpJDINLqLh1Q';
@@ -2227,12 +2227,25 @@ function obtenerVisitas() {
 }
 
 async function cargarEstadisticasGlobales() {
-    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*&order=visitas.desc`, {
+    // Pedimos TODOS los registros (sin complicar la consulta)
+    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*`, {
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
     });
     if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas globales.');
     const datos = await respuesta.json();
-    return { entries: datos, totalVisits: datos.reduce((sum, d) => sum + Number(d.visitas || 0), 0) };
+    
+    // Sumamos las visitas de cada módulo manualmente
+    const agregado = {};
+    datos.forEach(item => {
+        const id = item.modulo_id;
+        if (!agregado[id]) {
+            agregado[id] = { modulo_nombre: item.modulo_nombre, visitas: 0 };
+        }
+        agregado[id].visitas += Number(item.visitas || 0);
+    });
+    
+    const entries = Object.values(agregado).sort((a, b) => b.visitas - a.visitas);
+    return { entries: entries, totalVisits: entries.reduce((sum, e) => sum + e.visitas, 0) };
 }
 
 async function incrementarVisita(moduloId, moduloNombre) {
@@ -2242,15 +2255,14 @@ async function incrementarVisita(moduloId, moduloNombre) {
     visitas[moduloId].count++;
     localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
 
-    // Enviar a Supabase (global)
+    // Enviar a Supabase (global) - POST SIMPLE (esto arregla el error 400)
     try {
-        await fetch(`${SUPABASE_URL}uagrm_visitas?on_conflict=modulo_id`, {
+        await fetch(`${SUPABASE_URL}uagrm_visitas`, {
             method: 'POST',
             headers: {
                 apikey: SUPABASE_KEY,
                 Authorization: `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'resolution=merge-duplicates'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify([{ modulo_id: moduloId, modulo_nombre: moduloNombre, visitas: 1 }])
         });
