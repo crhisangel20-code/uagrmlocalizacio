@@ -2217,147 +2217,110 @@ function resetRotacionMapa() {
 })();
 
     // ===============================================================
-    // ESTADÍSTICAS: caché local de respaldo + API global de Supabase
-    // ===============================================================
-    const ESTADISTICAS_API = 'https://uagrmlocalizacio-production.up.railway.app/api/visits';
-    let estadisticasGlobales = null;
+// ESTADÍSTICAS GLOBALES CON SUPABASE (Nuevo)
+// ===============================================================
+const SUPABASE_URL = 'https://yvnxhnkapamcavmiaxmb.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bnhobmthcGFtY2F2bWlheG1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMjk1NDMsImV4cCI6MjEwMzgwNTU0M30.bRhjxGbC1xbU-XvWoGSKktULiyJdph3jpJDINLqLh1Q';
 
-    function obtenerVisitas() {
-        try {
-            return JSON.parse(localStorage.getItem('uagrm_visitas_modulos') || '{}');
-        } catch(e) { return {}; }
-    }
+function obtenerVisitas() {
+    try { return JSON.parse(localStorage.getItem('uagrm_visitas_modulos') || '{}'); } catch(e) { return {}; }
+}
 
-    function incrementarVisita(moduloId, moduloNombre) {
-        // Se conserva un respaldo local para que la interfaz no quede vacía
-        // si la API está temporalmente fuera de línea. No se presenta como
-        // estadística global.
-        const visitas = obtenerVisitas();
-        if (!visitas[moduloId]) {
-            visitas[moduloId] = { nombre: moduloNombre, count: 0 };
-        }
-        visitas[moduloId].count++;
-        visitas[moduloId].nombre = moduloNombre;
-        localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
+async function cargarEstadisticasGlobales() {
+    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*&order=visitas.desc`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+    if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas globales.');
+    const datos = await respuesta.json();
+    return { entries: datos, totalVisits: datos.reduce((sum, d) => sum + Number(d.visitas || 0), 0) };
+}
 
-        fetch(ESTADISTICAS_API, {
+async function incrementarVisita(moduloId, moduloNombre) {
+    // Guardar en el dispositivo (respaldo)
+    const visitas = obtenerVisitas();
+    if (!visitas[moduloId]) visitas[moduloId] = { nombre: moduloNombre, count: 0 };
+    visitas[moduloId].count++;
+    localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
+
+    // Enviar a Supabase (global)
+    try {
+        await fetch(`${SUPABASE_URL}uagrm_visitas?on_conflict=modulo_id`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ moduloId: moduloId, moduloNombre: moduloNombre })
-        }).then(function(respuesta) {
-            if (respuesta.ok) {
-                estadisticasGlobales = null;
-            }
-        }).catch(function(error) {
-            console.warn('No se pudo registrar la visita global:', error);
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([{ modulo_id: moduloId, modulo_nombre: moduloNombre, visitas: 1 }])
         });
-    }
+    } catch (e) { console.warn('No se pudo enviar visita global:', e); }
+}
 
-    function combinarRankingConEdificios(entradasGlobales) {
-        const porId = {};
-        (entradasGlobales || []).forEach(function(entry) {
-            porId[Number(entry.modulo_id)] = {
-                nombre: entry.modulo_nombre || '',
-                count: Number(entry.visitas) || 0,
-                ultimaVisita: entry.ultima_visita || null
-            };
-        });
-        return edificios.map(function(edificio) {
-            const visita = porId[edificio.id] || {};
-            return {
-                nombre: visita.nombre || edificio.nombre,
-                count: visita.count || 0,
-                ultimaVisita: visita.ultimaVisita || null
-            };
-        }).sort(function(a, b) {
-            return b.count - a.count || a.nombre.localeCompare(b.nombre);
-        });
-    }
-
-    function renderizarRanking(entradas, totalVisitas, fuente, esError) {
-        const rankingLista = document.getElementById('rankingLista');
-        rankingLista.innerHTML = '';
-
-        document.getElementById('estadisticasFuente').textContent = fuente;
-        document.getElementById('estadisticasFuente').classList.toggle('error', Boolean(esError));
-        const moduloMasVisitado = entradas.find(function(entry) { return entry.count > 0; });
+function mostrarEstadisticas() {
+    document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
+    document.getElementById('estadisticasFuente').textContent = 'Cargando estadísticas globales…';
+    cargarEstadisticasGlobales().then(datos => {
+        const totalVisitas = Number(datos.totalVisits) || 0;
+        const entradas = datos.entries;
+        const masVisitado = entradas.find(e => Number(e.visitas) > 0);
         document.getElementById('totalVisitas').textContent = totalVisitas;
-        document.getElementById('moduloMasVisitado').textContent = moduloMasVisitado
-            ? moduloMasVisitado.nombre.replace(/^↪\s*/, '')
-            : '—';
-
-        const maxVisitas = entradas[0] ? entradas[0].count : 0;
-        entradas.forEach(function(entry, i) {
-            const posicion = i + 1;
+        document.getElementById('moduloMasVisitado').textContent = masVisitado ? masVisitado.modulo_nombre : '—';
+        
+        const lista = document.getElementById('rankingLista');
+        lista.innerHTML = '';
+        if (totalVisitas === 0) {
+            lista.innerHTML = '<div class="ranking-vacio">Aún no hay visitas globales.</div>';
+        } else {
+            entradas.forEach((entry, i) => {
+                const item = document.createElement('div');
+                item.className = 'ranking-item';
+                const clase = (i === 0) ? 'top-1' : (i === 1) ? 'top-2' : (i === 2) ? 'top-3' : '';
+                const max = entradas[0].visitas;
+                const porcentaje = Math.round((Number(entry.visitas) / max) * 100);
+                item.innerHTML = 
+                    '<div class="ranking-posicion ' + clase + '">' + (i + 1) + '</div>' +
+                    '<div class="ranking-info">' +
+                        '<div class="ranking-nombre">' + entry.modulo_nombre + '</div>' +
+                        '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
+                    '</div>' +
+                    '<div class="ranking-visitas">' + entry.visitas + ' visitas</div>';
+                lista.appendChild(item);
+            });
+        }
+        document.getElementById('estadisticasFuente').textContent = 'Datos globales en vivo (Supabase)';
+    }).catch(() => {
+        // Si falla la conexión, muestra los datos de tu dispositivo
+        document.getElementById('estadisticasFuente').textContent = 'Error al cargar globales, mostrando local...';
+        const visitas = obtenerVisitas();
+        const ranking = edificios.map(ed => {
+            const visita = visitas[ed.id] || {};
+            return { nombre: ed.nombre, count: Number(visita.count) || 0 };
+        }).sort((a, b) => b.count - a.count || a.nombre.localeCompare(b.nombre));
+        const total = ranking.reduce((sum, item) => sum + item.count, 0);
+        document.getElementById('totalVisitas').textContent = total;
+        document.getElementById('moduloMasVisitado').textContent = total > 0 ? ranking[0].nombre.replace(/^↪\s*/, '') : '—';
+        const lista = document.getElementById('rankingLista');
+        lista.innerHTML = '';
+        if (total === 0) lista.innerHTML = '<div class="ranking-vacio">Aún no hay visitas.</div>';
+        else ranking.forEach((entry, i) => {
             const item = document.createElement('div');
             item.className = 'ranking-item';
-            const clasePos = posicion <= 3 ? 'top-' + posicion : '';
-            const porcentaje = maxVisitas ? Math.round((entry.count / maxVisitas) * 100) : 0;
-            item.innerHTML =
-                '<div class="ranking-posicion ' + clasePos + '">' + posicion + '</div>' +
-                '<div class="ranking-info">' +
-                    '<div class="ranking-nombre">' + entry.nombre + '</div>' +
-                    '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
-                '</div>' +
-                '<div class="ranking-visitas">' + entry.count + ' ' + (entry.count === 1 ? 'visita' : 'visitas') + '</div>';
-            rankingLista.appendChild(item);
+            item.innerHTML = '<div class="ranking-posicion">' + (i + 1) + '</div><div class="ranking-info"><div class="ranking-nombre">' + entry.nombre + '</div></div><div class="ranking-visitas">' + entry.count + '</div>';
+            lista.appendChild(item);
         });
-
-        document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
-    }
-
-    async function cargarEstadisticasGlobales() {
-        const respuesta = await fetch(ESTADISTICAS_API, { headers: { 'Accept': 'application/json' } });
-        const datos = await respuesta.json();
-        if (!respuesta.ok || !datos.ok) {
-            throw new Error(datos.message || 'No se pudieron cargar las estadísticas globales.');
-        }
-        estadisticasGlobales = datos;
-        return datos;
-    }
-
-    async function mostrarEstadisticas() {
-        document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
-        document.getElementById('estadisticasFuente').textContent = 'Cargando estadísticas globales…';
-        document.getElementById('estadisticasFuente').classList.remove('error');
-        document.getElementById('rankingLista').innerHTML = '<div class="ranking-vacio">Consultando visitas compartidas…</div>';
-        try {
-            const datos = estadisticasGlobales || await cargarEstadisticasGlobales();
-            const ultimaActualizacion = datos.fetchedAt
-                ? new Date(datos.fetchedAt).toLocaleString('es-BO')
-                : 'ahora';
-            renderizarRanking(
-                combinarRankingConEdificios(datos.entries),
-                Number(datos.totalVisits) || 0,
-                'Datos globales · actualizado ' + ultimaActualizacion,
-                false
-            );
-        } catch (error) {
-            console.warn('Estadísticas globales no disponibles:', error);
-            const visitas = obtenerVisitas();
-            const respaldo = edificios.map(function(edificio) {
-                const visita = visitas[edificio.id] || {};
-                return { nombre: edificio.nombre, count: Number(visita.count) || 0 };
-            }).sort(function(a, b) {
-                return b.count - a.count || a.nombre.localeCompare(b.nombre);
-            });
-            const totalRespaldo = respaldo.reduce(function(total, entry) { return total + entry.count; }, 0);
-            renderizarRanking(
-                respaldo,
-                totalRespaldo,
-                'Sin conexión global; mostrando solo este dispositivo',
-                true
-            );
-        }
-    }
-
-    document.getElementById('btnEstadisticas').addEventListener('click', mostrarEstadisticas);
-    document.getElementById('btnCerrarEstadisticas').addEventListener('click', function() {
-        document.getElementById('modalEstadisticasOverlay').classList.add('hidden');
+        document.getElementById('estadisticasFuente').textContent = 'Datos de este dispositivo';
     });
-    document.getElementById('modalEstadisticasOverlay').addEventListener('click', function(e) {
-        if (e.target === this) this.classList.add('hidden');
-    });
+}
+
+// Botones de cerrar y abrir
+document.getElementById('btnEstadisticas').addEventListener('click', mostrarEstadisticas);
+document.getElementById('btnCerrarEstadisticas').addEventListener('click', function() {
+    document.getElementById('modalEstadisticasOverlay').classList.add('hidden');
+});
+document.getElementById('modalEstadisticasOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+});
 
 
     // -------------------------------------------------------------
