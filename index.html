@@ -1136,7 +1136,8 @@
             <!-- AÑADIDO: se quitó el cuadro de origen manual y "Calcular ruta" — ya no se usa Google Maps, solo GPS -->
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
-        </div>
+        <button class="btn-estadisticas" id="btnFiltroEventos">📅 Eventos</button>
+ <button class="btn-estadisticas" id="btnFiltroPasantias">💼 Pasantías</button> </div>
 
         <div class="leyenda" id="leyenda"></div>
 
@@ -1219,7 +1220,6 @@
         </div>
         <button class="btn-cerrar-modal" id="btnCerrarModalLlegada">Entendido</button>
     </div>
-</div>
 
 <!-- AÑADIDO: toast de aviso "estás cerca del destino" (reemplaza el alert() nativo) -->
 <div class="toast-cerca" id="toastCerca">
@@ -1244,8 +1244,8 @@
             </div>
         </div>
         <div class="ranking-lista" id="rankingLista"></div>
-        <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
-    </div>
+                        <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
+          </div>
 </div>
 
 <script>
@@ -1772,6 +1772,15 @@ const emprendedoresDemo = [
     { id: 2, nombre: "Carlos - Ropa", producto: "Ropa deportiva", lat: -17.774500, lng: -63.195200, whatsapp: "https://wa.me/59171111111" },
     { id: 3, nombre: "Lucía - Artesanías", producto: "Pulseras y collares", lat: -17.776000, lng: -63.196500, whatsapp: "https://wa.me/59172222222" }
 ];
+// // ===============================================
+// (PROTOTIPO) EVENTOS Y PASANTÍAS CON ICONO PROPIO
+// ===============================================
+const eventosMapaDemo = [
+    { id: 1, tipo: 'evento', nombre: "Feria de Emprendimiento", fecha: "22 Nov, 9:00 AM", descripcion: "Muestra de proyectos y ventas.", lat: -17.7758, lng: -63.1940, img: "https://picsum.photos/seed/feria/400/200" },
+    { id: 2, tipo: 'evento', nombre: "Conferencia de Inteligencia Artificial", fecha: "05 Dic, 10:00 AM", descripcion: "Últimos avances en IA.", lat: -17.7742, lng: -63.1965, img: "https://picsum.photos/seed/ia/400/200" },
+    { id: 3, tipo: 'pasantia', nombre: "Pasantías en Ingeniería", fecha: "12 Dic, 8:00 AM", descripcion: "Inscripciones abiertas para estudiantes.", lat: -17.7761, lng: -63.1925, img: "https://picsum.photos/seed/pasantia/400/200" },
+    { id: 4, tipo: 'pasantia', nombre: "Pasantías en Contaduría", fecha: "15 Dic, 9:00 AM", descripcion: "Prácticas en auditoría.", lat: -17.7766, lng: -63.1941, img: "https://picsum.photos/seed/contaduria/400/200" }
+];
     const edificios = [
         { id: 1, nombre: "Ciudad Universitaria", lat: -17.775488, lng: -63.19373 },
         { id: 9, nombre: "↪ Cancha Polifuncional", lat: -17.7741408, lng: -63.1937158 },
@@ -1942,6 +1951,46 @@ emprendedoresDemo.forEach(emp => {
         <br><br><button onclick="irAEvento(${emp.lat}, ${emp.lng}, 'Emprendedor: ${emp.nombre}')" style="background:#3E7CB1; color:white; border:none; padding:5px 8px; border-radius:5px; cursor:pointer;">📍 Cómo llegar</button>
     `);
 });
+// ===============================================
+// MOSTRAR EVENTOS Y PASANTÍAS (AGRUPADOS EN CAPAS)
+// ===============================================
+// Creamos dos capas para poder ocultarlas/mostrarlas con botones
+const capaEventos = L.layerGroup().addTo(map);
+const capaPasantias = L.layerGroup().addTo(map);
+
+eventosMapaDemo.forEach(ev => {
+    // Elegimos el icono según el tipo
+    const iconoEvento = (ev.tipo === 'evento') ? '📅' : '💼';
+    const colorFondo = (ev.tipo === 'evento') ? '#D9A441' : '#3E7CB1'; // Dorado para eventos, Azul para pasantías
+
+    const icono = L.divIcon({
+        className: '',
+        html: `<div style="background:${colorFondo}; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; border:3px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.4); cursor:pointer;">${iconoEvento}</div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+    });
+
+    const markerEvento = L.marker([ev.lat, ev.lng], { icon: icono }).addTo(map);
+
+    markerEvento.bindPopup(`
+        <div style="text-align:center; width:250px;">
+            <img src="${ev.img}" alt="${ev.nombre}" style="width:100%; border-radius:8px; margin-bottom:10px;">
+            <strong style="display:block; font-size:16px;">${ev.nombre}</strong>
+            <span style="color:#B23A48; display:block; margin:5px 0; font-weight:bold;">📅 ${ev.fecha}</span>
+            <span style="display:block; margin-bottom:10px;">${ev.descripcion}</span>
+            <button onclick="irAEvento(${ev.lat}, ${ev.lng}, '${ev.nombre}')" style="background:#D9A441; color:#000; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">📍 Cómo llegar</button>
+        </div>
+    `);
+
+    // Agregamos el marcador a su capa correspondiente (Evento o Pasantía)
+    if (ev.tipo === 'evento') {
+        capaEventos.addLayer(markerEvento);
+    } else {
+        capaPasantias.addLayer(markerEvento);
+    }
+});
+
     edificios.forEach(ed => {
         const cat = categorizar(ed.nombre);
         const esSede = cat === 'sede';
@@ -2003,6 +2052,28 @@ function irAEvento(lat, lng, nombreDestino) {
     }
     planificarRuta(userLocation, destinoEvento);
 }
+// ===============================================
+// LÓGICA DE LOS BOTONES DE FILTRO (EVENTOS / PASANTÍAS)
+// ===============================================
+document.getElementById('btnFiltroEventos').addEventListener('click', function() {
+    if (map.hasLayer(capaEventos)) {
+        map.removeLayer(capaEventos);
+        this.style.opacity = '0.5'; // Botón apagado
+    } else {
+        capaEventos.addTo(map);
+        this.style.opacity = '1'; // Botón encendido
+    }
+});
+
+document.getElementById('btnFiltroPasantias').addEventListener('click', function() {
+    if (map.hasLayer(capaPasantias)) {
+        map.removeLayer(capaPasantias);
+        this.style.opacity = '0.5'; // Botón apagado
+    } else {
+        capaPasantias.addTo(map);
+        this.style.opacity = '1'; // Botón encendido
+    }
+});
     // -------------------------------------------------------------
     // 4. SELECTOR DE EDIFICIOS
     // -------------------------------------------------------------
