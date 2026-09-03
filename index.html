@@ -2553,13 +2553,14 @@
         }));
     }
 
-    if (capasRuta.length > 0) {
+        if (capasRuta.length > 0) {
         window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
         if (ajustarVista && coords.length > 1) {
             map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
         }
-    }
-    function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
+    } // cierra if (capasRuta.length > 0)
+} // cierra función dibujarRuta
+function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
@@ -2580,302 +2581,225 @@
     }
 
     function planificarRuta(originLatLng, destino, opciones) {
-        if (!destino) {
-            statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
-            return;
-        }
-        destinoActual = destino;
-        const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
+    if (!destino) {
+        statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
+        return;
+    }
+    destinoActual = destino;
+    const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
+    const opts = opciones || {};
+    const esRecalculoAutomatico = !!opts.recalculoAutomatico;
+    const navegacionEstabaActivaAntes = modoNavegacionActivo;
+    const distanciaDirectaMetros = dist * 1000;
 
-        // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: cuando esta ruta se calcula
-        // porque el usuario se desvió del sendero (no porque acaba de
-        // elegir un destino nuevo o presionar "Mi ubicación"), queremos
-        // que la experiencia de navegación siga fluida: si ya estaba
-        // navegando, que siga navegando sin tener que presionar de nuevo
-        // "Iniciar ruta a pie", y que el cronómetro de tiempo recorrido no
-        // se reinicie desde cero.
-        const opts = opciones || {};
-        const esRecalculoAutomatico = !!opts.recalculoAutomatico;
-        const navegacionEstabaActivaAntes = modoNavegacionActivo;
-        const distanciaDirectaMetros = dist * 1000;
-
-        // AÑADIDO PARA OPENROUTESERVICE: reiniciar estado de navegación/instrucciones
-        // cada vez que se calcula una ruta nueva (nuevo destino u origen).
-        // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si es un recálculo por desvío,
-        // no apagamos el modo navegación — se restaura después de trazar
-        // la nueva ruta.
-        if (!esRecalculoAutomatico) {
-            modoNavegacionActivo = false;
-        }
-        btnIniciarRutaPie.classList.add('hidden');
-        panelInstrucciones.classList.add('hidden');
-        document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: mostrar el texto de estado de nuevo mientras calcula
-
-        // AÑADIDO: se reinicia el trazado guardado de la ruta actual y la
-        // distancia total, para que el seguimiento por sendero use
-        // siempre los datos de la ruta recién calculada.
-        window.rutaCoordsActuales = null;
-        window.distanciaTotalRutaMetros = null;
-        tipoRutaActual = null;
-        ultimaPosicionCalculoRuta = { lat: originLatLng.lat, lng: originLatLng.lng };
-        ultimoCalculoRutaMs = Date.now();
-
-        limpiarCapaRuta();
-        if (window.originMarker) {
-            map.removeLayer(window.originMarker);
-            window.originMarker = null;
-        }
-        if (window.destMarker) {
-            map.removeLayer(window.destMarker);
-            window.destMarker = null;
-        }
-
-        // AÑADIDO: ya no se redirige a Google Maps sin importar la distancia —
-        // toda ruta se calcula y se dibuja siempre dentro del propio mapa.
-        const usandoRedPropia = redSenderos.nodos.length > 0;
-        const routerElegido = usandoRedPropia
-            ? new L.Routing.RedSenderosRouter()
-            : new L.Routing.ORSRouter({ proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/' });
-
-        statusMsg.innerHTML = esRecalculoAutomatico
-            ? '↩️ Recalculando tu ruta desde tu posición actual...'
-            : `🚶 Calculando ruta (${dist.toFixed(2)} km en línea recta)...`;
-
-        window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
-            .addTo(map).bindPopup('📍 Origen').openPopup();
-        window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
-            .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
-        // Círculo verde alrededor del GPS (radio 7.5 m = diámetro 15 m)
-if (circuloGPS) map.removeLayer(circuloGPS);
-circuloGPS = L.circle([originLatLng.lat, originLatLng.lng], {
-    radius: 7.5,
-    color: '#00cc44',
-    fillColor: '#00cc44',
-    fillOpacity: 0.3,
-    weight: 2
-}).addTo(map);
-
-// Círculo rojo alrededor del destino (radio 12.5 m = diámetro 25 m)
-if (circuloDestino) map.removeLayer(circuloDestino);
-circuloDestino = L.circle([destino.lat, destino.lng], {
-    radius: 12.5,
-    color: '#ff1744',
-    fillColor: '#ff1744',
-    fillOpacity: 0.2,
-    weight: 2,
-    dashArray: '4 4'
-}).addTo(map);
-        const waypointsRuta = [
-            { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
-            { latLng: L.latLng(destino.lat, destino.lng) }
-        ];
-
-        const completarRuta = function(error, rutas) {
-            if (error || !rutas || !rutas.length) {
-                console.error('Error de enrutamiento:', error);
-                statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta. Intenta de nuevo.';
-                document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: mostrar el mensaje de error
-                btnIniciarRutaPie.classList.add('hidden');
-                panelInstrucciones.classList.add('hidden');
-                return;
-            }
-            const ruta = rutas[0];
-            // Simplifica solo la geometría visible, conservando siempre el
-            // primer y el último punto exactos de la ruta.
-            ruta.coordinates = simplificarRutaDouglasPeucker(ruta.coordinates);
-            if (ruta.coordinates.length > 1) {
-                ruta.summary = ruta.summary || {};
-                ruta.summary.totalDistance = distanciaTotalCoordenadas(ruta.coordinates);
-                ruta.summary.totalTime = Math.round(ruta.summary.totalDistance / 1.2);
-            }
-            tipoRutaActual = ruta.tipo || 'senderos';
-            dibujarRuta(ruta.coordinates, true);
-
-            // AÑADIDO: se guarda el trazado real de la ruta (coordenadas
-            // que siguen los senderos/calles caminables) y su distancia
-            // total, para que el seguimiento en vivo mida el avance sobre
-            // ese trazado en vez de la línea recta al destino.
-            window.rutaCoordsActuales = ruta.coordinates;
-            window.distanciaTotalRutaMetros = ruta.summary && ruta.summary.totalDistance;
-
-            mostrarInstruccionesPeatonales(ruta.pasos || [], ruta.summary);
-
-            // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el usuario ya estaba
-            // navegando activamente cuando se disparó el recálculo por
-            // desvío, restauramos ese modo de inmediato (sin pedirle que
-            // presione "Iniciar ruta a pie" de nuevo) para que la
-            // experiencia sea continua, como en Google Maps/Waze. En
-            // cualquier otro caso (primer cálculo, o cambio manual de
-            // destino/origen) se muestra el botón para que el usuario
-            // decida cuándo iniciar.
-            if (esRecalculoAutomatico && navegacionEstabaActivaAntes) {
-                modoNavegacionActivo = true;
-                document.getElementById('infoPanel').classList.remove('solo-boton');
-                btnIniciarRutaPie.classList.add('hidden');
-                statusMsg.innerHTML = '↩️ Ruta recalculada. Sigue la línea lila y las indicaciones de abajo.';
-            } else {
-                // AÑADIDO: al lograrse la ruta, se oculta el texto y queda
-                // SOLO el botón "Iniciar ruta a pie", grande y arriba.
-                document.getElementById('infoPanel').classList.add('solo-boton');
-                btnIniciarRutaPie.classList.remove('hidden');
-            }
-        };
-
-        // Cerca del destino no se consulta la red de senderos: una ruta
-        // basada en nodos puede obligar al usuario a dar vueltas aunque ya
-        // esté prácticamente frente al edificio.
-        if (distanciaDirectaMetros <= 100) {
-    // Tramo corto: sin ruta, solo círculos y marcadores
-    statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
+    if (!esRecalculoAutomatico) {
+        modoNavegacionActivo = false;
+    }
     btnIniciarRutaPie.classList.add('hidden');
     panelInstrucciones.classList.add('hidden');
     document.getElementById('infoPanel').classList.remove('solo-boton');
+
+    window.rutaCoordsActuales = null;
+    window.distanciaTotalRutaMetros = null;
+    tipoRutaActual = null;
+    ultimaPosicionCalculoRuta = { lat: originLatLng.lat, lng: originLatLng.lng };
+    ultimoCalculoRutaMs = Date.now();
+
     limpiarCapaRuta();
-    return;
-} else {
-    // Tramo largo: calcular ruta
-    statusMsg.innerHTML = '🚶 Calculando ruta...';
-    routerElegido.route(waypointsRuta, completarRuta, null);
-}
+    if (window.originMarker) {
+        map.removeLayer(window.originMarker);
+        window.originMarker = null;
+    }
+    if (window.destMarker) {
+        map.removeLayer(window.destMarker);
+        window.destMarker = null;
+    }
 
-        // AÑADIDO PARA GA4: evento de ruta calculada
-        enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
-            event_category: 'Mapa UAGRM',
-            event_label: destino.nombre,
-            metodo_ruta: usandoRedPropia ? 'red_senderos_propia' : 'openrouteservice_peatonal',
-            distancia_km: Number(dist.toFixed(3)),
-            recalculo_automatico: esRecalculoAutomatico // AÑADIDO PARA RECÁLCULO AUTOMÁTICO
-        });
+    const usandoRedPropia = redSenderos.nodos.length > 0;
+    const routerElegido = usandoRedPropia
+        ? new L.Routing.RedSenderosRouter()
+        : new L.Routing.ORSRouter({ proxyUrl: 'https://ors-proxy-uagrm.crhisangel20.workers.dev/' });
 
-        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        window.alertaCercaMostrada = false; // AÑADIDO: renombrado y separado de la alerta de llegada
-        window.alertaLlegadaMostrada = false; // AÑADIDO: nueva alerta específica de "ya llegaste"
-        // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el recálculo es por desvío,
-        // no reiniciamos el cronómetro de tiempo recorrido — el usuario
-        // sigue en el mismo recorrido, solo cambió el trazado.
-        if (!esRecalculoAutomatico || !window.tiempoInicioRuta) {
-            window.tiempoInicioRuta = Date.now();
-        }
-        watchId = navigator.geolocation.watchPosition(
-            function(pos) {
-                const userLat = pos.coords.latitude;
-                const userLng = pos.coords.longitude;
-                userLocation = { lat: userLat, lng: userLng };
-                // Actualizar círculo GPS
- if (circuloGPS) {
-    circuloGPS.setLatLng([userLat, userLng]);
-} else {
-    circuloGPS = L.circle([userLat, userLng], {
+    statusMsg.innerHTML = esRecalculoAutomatico
+        ? '↩️ Recalculando tu ruta desde tu posición actual...'
+        : `🚶 Calculando ruta (${dist.toFixed(2)} km en línea recta)...`;
+
+    window.originMarker = L.marker([originLatLng.lat, originLatLng.lng], { icon: iconoOrigenDestino('origen') })
+        .addTo(map).bindPopup('📍 Origen').openPopup();
+    window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
+        .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+
+    if (circuloGPS) map.removeLayer(circuloGPS);
+    circuloGPS = L.circle([originLatLng.lat, originLatLng.lng], {
         radius: 7.5,
         color: '#00cc44',
         fillColor: '#00cc44',
         fillOpacity: 0.3,
         weight: 2
     }).addTo(map);
-}
-                // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
-                // "Iniciar ruta a pie", seguimos su posición en vivo
-                // recentrando el mapa y moviendo el marcador de origen.
-                if (modoNavegacionActivo) {
-                    if (window.originMarker) {
-                        window.originMarker.setLatLng([userLat, userLng]);
-                    }
-                    map.setView([userLat, userLng], 19, { animate: true });
-                }
 
-                const distLineaRecta = distancia(userLat, userLng, destino.lat, destino.lng) * 1000;
-                const precisionGPS = pos.coords.accuracy || 15;
+    if (circuloDestino) map.removeLayer(circuloDestino);
+    circuloDestino = L.circle([destino.lat, destino.lng], {
+        radius: 12.5,
+        color: '#ff1744',
+        fillColor: '#ff1744',
+        fillOpacity: 0.2,
+        weight: 2,
+        dashArray: '4 4'
+    }).addTo(map);
 
-                // La llegada siempre usa la distancia GPS directa. No se
-                // permite que un sendero con curvas impida finalizar cuando
-                // el usuario ya está a menos de 15 m del destino.
-                if (distLineaRecta <= UMBRAL_LLEGADA_METROS) {
-                    finalizarRuta(destino, precisionGPS, distLineaRecta);
-                    return;
-                }
-		// Si la distancia es <= 100 m, no mostramos ruta, solo círculos
-if (distLineaRecta <= 100) {
-    if (window.capaRutaPeatonal) {
-        limpiarCapaRuta();
+    const waypointsRuta = [
+        { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
+        { latLng: L.latLng(destino.lat, destino.lng) }
+    ];
+
+    const completarRuta = function(error, rutas) {
+        if (error || !rutas || !rutas.length) {
+            console.error('Error de enrutamiento:', error);
+            statusMsg.innerHTML = '⚠️ No se pudo calcular la ruta. Intenta de nuevo.';
+            document.getElementById('infoPanel').classList.remove('solo-boton');
+            btnIniciarRutaPie.classList.add('hidden');
+            panelInstrucciones.classList.add('hidden');
+            return;
+        }
+        const ruta = rutas[0];
+        ruta.coordinates = simplificarRutaDouglasPeucker(ruta.coordinates);
+        if (ruta.coordinates.length > 1) {
+            ruta.summary = ruta.summary || {};
+            ruta.summary.totalDistance = distanciaTotalCoordenadas(ruta.coordinates);
+            ruta.summary.totalTime = Math.round(ruta.summary.totalDistance / 1.2);
+        }
+        tipoRutaActual = ruta.tipo || 'senderos';
+        dibujarRuta(ruta.coordinates, true);
+
+        window.rutaCoordsActuales = ruta.coordinates;
+        window.distanciaTotalRutaMetros = ruta.summary && ruta.summary.totalDistance;
+
+        mostrarInstruccionesPeatonales(ruta.pasos || [], ruta.summary);
+
+        if (esRecalculoAutomatico && navegacionEstabaActivaAntes) {
+            modoNavegacionActivo = true;
+            document.getElementById('infoPanel').classList.remove('solo-boton');
+            btnIniciarRutaPie.classList.add('hidden');
+            statusMsg.innerHTML = '↩️ Ruta recalculada. Sigue la línea lila y las indicaciones de abajo.';
+        } else {
+            document.getElementById('infoPanel').classList.add('solo-boton');
+            btnIniciarRutaPie.classList.remove('hidden');
+        }
+    };
+
+    if (distanciaDirectaMetros <= 100) {
+        statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
+        document.getElementById('infoPanel').classList.remove('solo-boton');
+        limpiarCapaRuta();
+        return;
+    } else {
+        statusMsg.innerHTML = '🚶 Calculando ruta...';
+        routerElegido.route(waypointsRuta, completarRuta, null);
     }
-    statusMsg.innerHTML = '✅ Estás a ' + Math.round(distLineaRecta) + ' m del destino. Sigue los círculos.';
-    return;
+
+    enviarEventoGA4('ruta_calculada', {
+        event_category: 'Mapa UAGRM',
+        event_label: destino.nombre,
+        metodo_ruta: usandoRedPropia ? 'red_senderos_propia' : 'openrouteservice_peatonal',
+        distancia_km: Number(dist.toFixed(3)),
+        recalculo_automatico: esRecalculoAutomatico
+    });
+
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    window.alertaCercaMostrada = false;
+    window.alertaLlegadaMostrada = false;
+    if (!esRecalculoAutomatico || !window.tiempoInicioRuta) {
+        window.tiempoInicioRuta = Date.now();
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        function(pos) {
+            const userLat = pos.coords.latitude;
+            const userLng = pos.coords.longitude;
+            userLocation = { lat: userLat, lng: userLng };
+            if (circuloGPS) {
+                circuloGPS.setLatLng([userLat, userLng]);
+            } else {
+                circuloGPS = L.circle([userLat, userLng], {
+                    radius: 7.5,
+                    color: '#00cc44',
+                    fillColor: '#00cc44',
+                    fillOpacity: 0.3,
+                    weight: 2
+                }).addTo(map);
+            }
+            if (modoNavegacionActivo) {
+                if (window.originMarker) {
+                    window.originMarker.setLatLng([userLat, userLng]);
+                }
+                map.setView([userLat, userLng], 19, { animate: true });
+            }
+
+            const distLineaRecta = distancia(userLat, userLng, destino.lat, destino.lng) * 1000;
+            const precisionGPS = pos.coords.accuracy || 15;
+
+            if (distLineaRecta <= UMBRAL_LLEGADA_METROS) {
+                finalizarRuta(destino, precisionGPS, distLineaRecta);
+                return;
+            }
+
+            if (distLineaRecta <= 100) {
+                statusMsg.innerHTML = '✅ Estás a ' + Math.round(distLineaRecta) + ' m del destino. Sigue los círculos.';
+                return;
+            }
+
+            if (tipoRutaActual === 'directa') {
+                planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
+                return;
+            }
+
+            const infoRuta = distanciaRestanteEnRuta(window.rutaCoordsActuales, userLat, userLng);
+            const dMetros = infoRuta ? infoRuta.distanciaRestanteMetros : distLineaRecta;
+
+            verificarEntradaCampus(userLat, userLng);
+
+            const ahoraActualizacion = Date.now();
+            const metrosDesdeUltimoCalculo = ultimaPosicionCalculoRuta
+                ? distancia(userLat, userLng, ultimaPosicionCalculoRuta.lat, ultimaPosicionCalculoRuta.lng) * 1000
+                : Infinity;
+            if (
+                modoNavegacionActivo &&
+                metrosDesdeUltimoCalculo >= 5 &&
+                ahoraActualizacion - ultimoCalculoRutaMs >= INTERVALO_ACTUALIZACION_RUTA_MS
+            ) {
+                planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
+                return;
+            }
+
+            if (infoRuta && infoRuta.distanciaAlSenderoMetros > UMBRAL_DESVIO_METROS) {
+                const ahoraMs = Date.now();
+                const tiempoDesdeUltimoRecalculo = ahoraMs - (window.ultimoRecalculoTimestamp || 0);
+                if (tiempoDesdeUltimoRecalculo > INTERVALO_MINIMO_RECALCULO_MS) {
+                    window.ultimoRecalculoTimestamp = ahoraMs;
+                    mostrarToastCerca('↩️ Te saliste del camino marcado. Recalculando tu ruta...');
+                    planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
+                    return;
+                }
+            }
+
+            if (dMetros <= 100) {
+                statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m siguiendo la ruta). Sigue la línea lila para llegar a tu destino.';
+                if (!window.alertaCercaMostrada) {
+                    mostrarToastCerca(`Estás a unos ${Math.round(dMetros)} m de tu destino. Sigue la línea lila en el mapa.`);
+                    window.alertaCercaMostrada = true;
+                }
+            }
+        },
+        function(err) {
+            console.warn('Error en watchPosition:', err);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
 }
-                
-                // Si el usuario se aleja después de estar en el tramo
-                // directo, se reconstruye la ruta larga desde su GPS.
-                if (tipoRutaActual === 'directa') {
-                    planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
-                    return;
-                }
-
-                // AÑADIDO: si existe una ruta trazada (red de senderos u
-                // OpenRouteService), la distancia restante se mide
-                // SIGUIENDO ese trazado real caminable, en vez de en línea
-                // recta. Así el aviso de "cerca" y la detección de
-                // "llegada" son fieles al camino que el usuario realmente
-                // recorre — por ejemplo, si el sendero rodea un edificio,
-                // la app no avisa "llegaste" mientras aún falta rodear.
-                const infoRuta = distanciaRestanteEnRuta(window.rutaCoordsActuales, userLat, userLng);
-                const dMetros = infoRuta ? infoRuta.distanciaRestanteMetros : distLineaRecta;
-
-                // AÑADIDO PARA DETECCIÓN DE "ENTRASTE AL CAMPUS": cada
-                // lectura de GPS también revisa si el usuario entró o
-                // salió de los polígonos del campus.
-                verificarEntradaCampus(userLat, userLng);
-
-                // Mientras la navegación está activa, refresca la ruta cada
-                // cinco segundos si el usuario realmente avanzó, evitando
-                // llamadas repetidas por el ruido normal del GPS.
-                const ahoraActualizacion = Date.now();
-                const metrosDesdeUltimoCalculo = ultimaPosicionCalculoRuta
-                    ? distancia(userLat, userLng, ultimaPosicionCalculoRuta.lat, ultimaPosicionCalculoRuta.lng) * 1000
-                    : Infinity;
-                if (
-                    modoNavegacionActivo &&
-                    metrosDesdeUltimoCalculo >= 5 &&
-                    ahoraActualizacion - ultimoCalculoRutaMs >= INTERVALO_ACTUALIZACION_RUTA_MS
-                ) {
-                    planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
-                    return;
-                }
-
-                // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: si el usuario se aleja
-                // del sendero trazado más del margen permitido, se recalcula
-                // la ruta completa desde su posición actual hasta el mismo
-                // destino — igual que hacen Google Maps/Waze cuando te
-                // desvías del camino sugerido. Se usa un tiempo mínimo entre
-                // recálculos para no disparar uno nuevo mientras el GPS
-                // todavía tiene el ruido normal de la lectura anterior.
-                if (infoRuta && infoRuta.distanciaAlSenderoMetros > UMBRAL_DESVIO_METROS) {
-                    const ahoraMs = Date.now();
-                    const tiempoDesdeUltimoRecalculo = ahoraMs - (window.ultimoRecalculoTimestamp || 0);
-                    if (tiempoDesdeUltimoRecalculo > INTERVALO_MINIMO_RECALCULO_MS) {
-                        window.ultimoRecalculoTimestamp = ahoraMs;
-                        mostrarToastCerca('↩️ Te saliste del camino marcado. Recalculando tu ruta...');
-                        planificarRuta({ lat: userLat, lng: userLng }, destino, { recalculoAutomatico: true });
-                        return; // planificarRuta ya reinicia su propio watchPosition
-                    }
-                }
-
-                if (dMetros <= 100) {
-                    // AÑADIDO: este aviso ahora NO detiene el GPS — sigue
-                    // rastreando hasta detectar la llegada real, y usa la
-                    // distancia restante sobre el sendero real (no línea recta).
-                    statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m siguiendo la ruta). Sigue la línea lila para llegar a tu destino.';
-                    if (!window.alertaCercaMostrada) {
-                        mostrarToastCerca(`Estás a unos ${Math.round(dMetros)} m de tu destino. Sigue la línea lila en el mapa.`);
-                        window.alertaCercaMostrada = true;
-                    }
-                }
-            },
-            function(err) { console.warn('Error en watchPosition:', err); },
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-        );
-    }
 
     // AÑADIDO PARA OPENROUTESERVICE: al presionar "Iniciar ruta a pie" se
     // activa el modo de seguimiento en vivo (el mapa se recentra en tu
