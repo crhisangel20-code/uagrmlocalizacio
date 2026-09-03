@@ -2227,20 +2227,16 @@ function obtenerVisitas() {
 }
 
 async function cargarEstadisticasGlobales() {
-    // Pedimos TODOS los registros (sin complicar la consulta)
-    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    });
+    // Sin cabeceras para evitar el bloqueo de CORS del navegador
+    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*`);
     if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas globales.');
     const datos = await respuesta.json();
     
-    // Sumamos las visitas de cada módulo manualmente
+    // Sumamos las visitas de cada módulo
     const agregado = {};
     datos.forEach(item => {
         const id = item.modulo_id;
-        if (!agregado[id]) {
-            agregado[id] = { modulo_nombre: item.modulo_nombre, visitas: 0 };
-        }
+        if (!agregado[id]) agregado[id] = { modulo_nombre: item.modulo_nombre, visitas: 0 };
         agregado[id].visitas += Number(item.visitas || 0);
     });
     
@@ -2249,36 +2245,25 @@ async function cargarEstadisticasGlobales() {
 }
 
 async function incrementarVisita(moduloId, moduloNombre) {
-    // Guardar en el dispositivo (respaldo)
-    const visitas = obtenerVisitas();
-    if (!visitas[moduloId]) visitas[moduloId] = { nombre: moduloNombre, count: 0 };
-    visitas[moduloId].count++;
-    localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
-
-    // Enviar a Supabase (global) - POST SIMPLE (esto arregla el error 400)
-        try {
+    // Enviar a Supabase (global) - POST SIMPLE (sin cabeceras para CORS)
+    try {
         const respuestaGuardado = await fetch(`${SUPABASE_URL}uagrm_visitas`, {
             method: 'POST',
-            headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                Prefer: 'return=minimal'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify([{ modulo_id: moduloId, modulo_nombre: moduloNombre, visitas: 1 }])
         });
-        if (!respuestaGuardado.ok) {
-            const detalleError = await respuestaGuardado.text();
-            console.error('❌ SUPABASE RECHAZÓ EL GUARDADO (código ' + respuestaGuardado.status + '):', detalleError);
-        } else {
+        if (respuestaGuardado.ok) {
             console.log('✅ Visita guardada correctamente en Supabase.');
+        } else {
+            console.error('❌ Error al guardar en Supabase:', respuestaGuardado.status);
         }
-        } catch (e) { console.error('❌ NO SE PUDO CONECTAR CON SUPABASE:', e); }
+    } catch (e) { console.error('❌ NO SE PUDO CONECTAR CON SUPABASE:', e); }
 }
 
 function mostrarEstadisticas() {
     document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
     document.getElementById('estadisticasFuente').textContent = 'Cargando estadísticas globales…';
+    
     cargarEstadisticasGlobales().then(datos => {
         const totalVisitas = Number(datos.totalVisits) || 0;
         const entradas = datos.entries;
@@ -2308,27 +2293,15 @@ function mostrarEstadisticas() {
             });
         }
         document.getElementById('estadisticasFuente').textContent = 'Datos globales en vivo (Supabase)';
-    }).catch(() => {
-        // Si falla la conexión, muestra los datos de tu dispositivo
-        document.getElementById('estadisticasFuente').textContent = 'Error al cargar globales, mostrando local...';
-        const visitas = obtenerVisitas();
-        const ranking = edificios.map(ed => {
-            const visita = visitas[ed.id] || {};
-            return { nombre: ed.nombre, count: Number(visita.count) || 0 };
-        }).sort((a, b) => b.count - a.count || a.nombre.localeCompare(b.nombre));
-        const total = ranking.reduce((sum, item) => sum + item.count, 0);
-        document.getElementById('totalVisitas').textContent = total;
-        document.getElementById('moduloMasVisitado').textContent = total > 0 ? ranking[0].nombre.replace(/^↪\s*/, '') : '—';
+
+    }).catch(error => {
+        // Si falla, solo muestra error (NO datos locales)
+        console.error('No se pudieron cargar los globales:', error);
+        document.getElementById('estadisticasFuente').textContent = '⚠️ Error al conectar con la base de datos global.';
+        document.getElementById('totalVisitas').textContent = '0';
+        document.getElementById('moduloMasVisitado').textContent = '—';
         const lista = document.getElementById('rankingLista');
-        lista.innerHTML = '';
-        if (total === 0) lista.innerHTML = '<div class="ranking-vacio">Aún no hay visitas.</div>';
-        else ranking.forEach((entry, i) => {
-            const item = document.createElement('div');
-            item.className = 'ranking-item';
-            item.innerHTML = '<div class="ranking-posicion">' + (i + 1) + '</div><div class="ranking-info"><div class="ranking-nombre">' + entry.nombre + '</div></div><div class="ranking-visitas">' + entry.count + '</div>';
-            lista.appendChild(item);
-        });
-        document.getElementById('estadisticasFuente').textContent = 'Datos de este dispositivo';
+        lista.innerHTML = '<div class="ranking-vacio">No se pudo cargar la información global. Revisa tu conexión.</div>';
     });
 }
 
