@@ -2651,7 +2651,7 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         }
     };
 
-    if (distanciaDirectaMetros <= 400) {
+    if (distanciaDirectaMetros <= 260) {
         statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
