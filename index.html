@@ -18,22 +18,12 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<!-- Leaflet Rotate plugin (para que gire como Google Maps) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-rotate/dist/leaflet-rotate.css" />
-<script src="https://unpkg.com/leaflet-rotate/dist/leaflet-rotate.min.js"></script>
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-<!-- Leaflet JS (NECESARIO) -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Mapbox GL JS (WebGL para mapas vectoriales) -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
-<!-- Plugin para integrar Mapbox GL con Leaflet -->
-<script src="https://cdn.jsdelivr.net/npm/mapbox-gl-leaflet/leaflet-mapbox-gl.js"></script>
     <!-- Tipografías: Fraunces (identidad / herencia colonial) + Inter (utilitaria) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
-<!-- Leaflet Routing Machine JS -->
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
     <!-- AÑADIDO PARA GA4: Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-0XWZF34L0N"></script>
     <script>
@@ -653,16 +643,13 @@
         .ranking-posicion.top-3 { color: #cd7f32; }
         .ranking-info { flex: 1; min-width: 0; }
         .ranking-nombre {
-    font-weight: 600;
-    font-size: 0.88rem;
-    color: var(--text-main);
-    white-space: normal;
-    overflow: hidden;
-    text-overflow: clip;
-    line-height: 1.4;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-}
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .ranking-barra-bg {
             height: 6px;
             background: rgba(11,110,79,0.12);
@@ -1095,6 +1082,7 @@
             .btn-ingresar { padding: 12px 24px; }
         }
     </style>
+    <script src="https://unpkg.com/leaflet-curve@0.2.0/dist/leaflet.curve.js"></script>
 </head>
 <body>
 
@@ -1136,8 +1124,7 @@
             <!-- AÑADIDO: se quitó el cuadro de origen manual y "Calcular ruta" — ya no se usa Google Maps, solo GPS -->
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
-        <button class="btn-estadisticas" id="btnFiltroEventos">📅 Eventos</button>
- <button class="btn-estadisticas" id="btnFiltroPasantias">💼 Pasantías</button> </div>
+        </div>
 
         <div class="leyenda" id="leyenda"></div>
 
@@ -1220,6 +1207,7 @@
         </div>
         <button class="btn-cerrar-modal" id="btnCerrarModalLlegada">Entendido</button>
     </div>
+</div>
 
 <!-- AÑADIDO: toast de aviso "estás cerca del destino" (reemplaza el alert() nativo) -->
 <div class="toast-cerca" id="toastCerca">
@@ -1244,11 +1232,14 @@
             </div>
         </div>
         <div class="ranking-lista" id="rankingLista"></div>
-                        <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
-          </div>
+        <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
+    </div>
 </div>
 
-<script>
+<!-- Scripts Leaflet y plugins -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+ <script>
     // Función para transformar líneas rectas en curvas suaves (estilo Google Maps)
     function crearCurva(puntos) {
         if (!puntos || puntos.length < 2) return "";
@@ -1755,32 +1746,6 @@
     // -------------------------------------------------------------
     // 1. DATOS DE EDIFICIOS
     // -------------------------------------------------------------
-// ===============================================
-// (PROTOTIPO) DATOS HIPOTÉTICOS DE EVENTOS
-// ===============================================
-const eventosDemo = [
-    { id: 1, nombre: "Feria de Emprendimiento", fecha: "22 de Noviembre, 9:00 AM", descripcion: "Muestra de proyectos estudiantiles", edificioId: 21, lat: -17.7756049, lng: -63.1949454 },
-    { id: 2, nombre: "Congreso de Medicina", fecha: "05 de Diciembre, 10:00 AM", descripcion: "Conferencias de actualización", edificioId: 57, lat: -17.7749599, lng: -63.1976638 },
-    { id: 3, nombre: "Torneo Interfacultades", fecha: "15 de Diciembre, 14:00 PM", descripcion: "Campeonato de fútbol y básquet", edificioId: 40, lat: -17.7780142, lng: -63.1955953 }
-];
-
-// ===============================================
-// (PROTOTIPO) DATOS HIPOTÉTICOS DE EMPRENDEDORES
-// ===============================================
-const emprendedoresDemo = [
-    { id: 1, nombre: "María - Repostería", producto: "Tortas y postres artesanales", lat: -17.775300, lng: -63.193500, whatsapp: "https://wa.me/59170000000" },
-    { id: 2, nombre: "Carlos - Ropa", producto: "Ropa deportiva", lat: -17.774500, lng: -63.195200, whatsapp: "https://wa.me/59171111111" },
-    { id: 3, nombre: "Lucía - Artesanías", producto: "Pulseras y collares", lat: -17.776000, lng: -63.196500, whatsapp: "https://wa.me/59172222222" }
-];
-// // ===============================================
-// (PROTOTIPO) EVENTOS Y PASANTÍAS CON ICONO PROPIO
-// ===============================================
-const eventosMapaDemo = [
-    { id: 1, tipo: 'evento', nombre: "Feria de Emprendimiento", fecha: "22 Nov, 9:00 AM", descripcion: "Muestra de proyectos y ventas.", lat: -17.7758, lng: -63.1940, img: "https://picsum.photos/seed/feria/400/200" },
-    { id: 2, tipo: 'evento', nombre: "Conferencia de Inteligencia Artificial", fecha: "05 Dic, 10:00 AM", descripcion: "Últimos avances en IA.", lat: -17.7742, lng: -63.1965, img: "https://picsum.photos/seed/ia/400/200" },
-    { id: 3, tipo: 'pasantia', nombre: "Pasantías en Ingeniería", fecha: "12 Dic, 8:00 AM", descripcion: "Inscripciones abiertas para estudiantes.", lat: -17.7761, lng: -63.1925, img: "https://picsum.photos/seed/pasantia/400/200" },
-    { id: 4, tipo: 'pasantia', nombre: "Pasantías en Contaduría", fecha: "15 Dic, 9:00 AM", descripcion: "Prácticas en auditoría.", lat: -17.7766, lng: -63.1941, img: "https://picsum.photos/seed/contaduria/400/200" }
-];
     const edificios = [
         { id: 1, nombre: "Ciudad Universitaria", lat: -17.775488, lng: -63.19373 },
         { id: 9, nombre: "↪ Cancha Polifuncional", lat: -17.7741408, lng: -63.1937158 },
@@ -1797,7 +1762,7 @@ const eventosMapaDemo = [
         { id: 18, nombre: "↪ Módulo 222 - Aulas", lat: -17.7742182, lng: -63.1947392 },
         { id: 19, nombre: "↪ Módulo 223 - Snack", lat: -17.7748164, lng: -63.1944736 },
         { id: 20, nombre: "↪ Módulo 224 - Tecnología", lat: -17.7754529, lng: -63.1944685 },
-        { id: 21, nombre: "↪ Módulo 225 - Facultad de Ciencias Exactas y Tecnología", lat: -17.7756049, lng: -63.1949454, redes: { facebook: "https://facebook.com/facultaddetecnologiauagrm", instagram: "https://instagram.com/facultaddetecnologiauagrm" } },        
+        { id: 21, nombre: "↪ Módulo 225 - Facultad de Ciencias Exactas y Tecnología", lat: -17.7756049, lng: -63.1949454 },
         { id: 22, nombre: "↪ Módulo 226 - Cancha Polifuncional", lat: -17.7762949, lng: -63.1947181 },
         { id: 23, nombre: "↪ Módulo 228 - Edif. Central Facultad de Veterinaria", lat: -17.7768097, lng: -63.1948632 },
         { id: 24, nombre: "↪ Módulo 229 - Biblioteca Veterinaria", lat: -17.7770957, lng: -63.1944429 },
@@ -1834,7 +1799,7 @@ const eventosMapaDemo = [
         { id: 54, nombre: "↪ Módulo 264 - Fac. Cs. Económicas", lat: -17.7764367, lng: -63.1969474 },
         { id: 55, nombre: "↪ Módulo 265 - Fac. Cs. Económicas", lat: -17.7767357, lng: -63.1966756 },
         { id: 56, nombre: "↪ Módulo 270 - Coliseo Deportivo", lat: -17.7736789, lng: -63.1975340 },
-        { id: 57, nombre: "↪ Módulo 272 - Fac. Cs. de la Salud Humana", lat: -17.7749599, lng: -63.1976638, redes: { facebook: "https://facebook.com/medicina.uagrm", instagram: "https://instagram.com/medicina.uagrm" } },
+        { id: 57, nombre: "↪ Módulo 272 - Fac. Cs. de la Salud Humana", lat: -17.7749599, lng: -63.1976638 },
         { id: 58, nombre: "↪ Módulo 273 - Estacionamiento Vertical y Cancha Polifuncional", lat: -17.7765467, lng: -63.1973747 },
         { id: 59, nombre: "↪ Módulo 274 - Canal 11 Televisión Universitaria", lat: -17.7774150, lng: -63.1976100 },
         { id: 60, nombre: "↪ Módulo 280 - Fac. Cs. de la Salud Humana", lat: -17.7746590, lng: -63.1979140 },
@@ -1910,115 +1875,19 @@ const eventosMapaDemo = [
     // -------------------------------------------------------------
     // 3. MAPA Y CAPAS
     // -------------------------------------------------------------
-   const map = L.map('mapid', {
-    center: [-17.78, -63.18],
-    zoom: 12,
-    rotate: true,      // <--- Activa la rotación suave
-    bearing: 0         // <--- Apunta al Norte
-});
+    const map = L.map('mapid').setView([-17.78, -63.18], 12);
 
-    // ===============================================================
-// PASO FINAL: MAPA VECTORIAL CON MAPTILER (WebGL + 3D)
-// ===============================================================
-const maptilerKey = 'uuO75vatnFPQY1HAWlqI'; // <-- Cambia esto por tu clave real
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
 
-// Si no tienes clave, puedes probar con OpenMapTiles (sin registro):
-// Capa de fondo clásica (OpenStreetMap) que siempre funciona
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 20,
-    attribution: '© OpenStreetMap'
-}).addTo(map);
     // Marcadores
     const markers = {};
-// ===============================================
-// MOSTRAR EMPRENDEDORES EN EL MAPA (PROTOTIPO)
-// ===============================================
-emprendedoresDemo.forEach(emp => {
-    const iconoEmprendedor = L.divIcon({
-        className: '',
-        html: `<div style="background:#6B4C9A; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:16px; border:3px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.4);">🛍️</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-        popupAnchor: [0, -15]
-    });
-
-    const markerEmprendedor = L.marker([emp.lat, emp.lng], { icon: iconoEmprendedor }).addTo(map);
-    
-    markerEmprendedor.bindPopup(`
-        <strong>🛍️ ${emp.nombre}</strong><br>
-        <em>${emp.producto}</em><br><br>
-        <a href="${emp.whatsapp}" target="_blank" style="background:#25D366; color:white; padding:8px 12px; text-decoration:none; border-radius:5px; font-weight:bold;">📱 Pedir por WhatsApp</a>
-        <br><br><button onclick="irAEvento(${emp.lat}, ${emp.lng}, 'Emprendedor: ${emp.nombre}')" style="background:#3E7CB1; color:white; border:none; padding:5px 8px; border-radius:5px; cursor:pointer;">📍 Cómo llegar</button>
-    `);
-});
-// ===============================================
-// MOSTRAR EVENTOS Y PASANTÍAS (AGRUPADOS EN CAPAS)
-// ===============================================
-// Creamos dos capas para poder ocultarlas/mostrarlas con botones
-const capaEventos = L.layerGroup().addTo(map);
-const capaPasantias = L.layerGroup().addTo(map);
-
-eventosMapaDemo.forEach(ev => {
-    // Elegimos el icono según el tipo
-    const iconoEvento = (ev.tipo === 'evento') ? '📅' : '💼';
-    const colorFondo = (ev.tipo === 'evento') ? '#D9A441' : '#3E7CB1'; // Dorado para eventos, Azul para pasantías
-
-    const icono = L.divIcon({
-        className: '',
-        html: `<div style="background:${colorFondo}; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; border:3px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.4); cursor:pointer;">${iconoEvento}</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18]
-    });
-
-    const markerEvento = L.marker([ev.lat, ev.lng], { icon: icono }).addTo(map);
-
-    markerEvento.bindPopup(`
-        <div style="text-align:center; width:250px;">
-            <img src="${ev.img}" alt="${ev.nombre}" style="width:100%; border-radius:8px; margin-bottom:10px;">
-            <strong style="display:block; font-size:16px;">${ev.nombre}</strong>
-            <span style="color:#B23A48; display:block; margin:5px 0; font-weight:bold;">📅 ${ev.fecha}</span>
-            <span style="display:block; margin-bottom:10px;">${ev.descripcion}</span>
-            <button onclick="irAEvento(${ev.lat}, ${ev.lng}, '${ev.nombre}')" style="background:#D9A441; color:#000; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">📍 Cómo llegar</button>
-        </div>
-    `);
-
-    // Agregamos el marcador a su capa correspondiente (Evento o Pasantía)
-    if (ev.tipo === 'evento') {
-        capaEventos.addLayer(markerEvento);
-    } else {
-        capaPasantias.addLayer(markerEvento);
-    }
-});
-
     edificios.forEach(ed => {
         const cat = categorizar(ed.nombre);
         const esSede = cat === 'sede';
         const c = CATEGORIAS[cat];
-         // Buscar eventos para este edificio
-        const eventosDeEsteEdificio = eventosDemo.filter(ev => ev.edificioId === ed.id);
-        let eventosHTML = '';
-        if (eventosDeEsteEdificio.length > 0) {
-            eventosDeEsteEdificio.forEach(ev => {
-                eventosHTML += `<div style="margin-top:8px; border-top:1px solid #eee; padding-top:6px;">
-                    <strong>📅 ${ev.nombre}</strong><br>
-                    🕐 ${ev.fecha}<br>
-                    ${ev.descripcion}<br>
-                    <button onclick="irAEvento(${ev.lat}, ${ev.lng}, '${ev.nombre}')" style="background:#D9A441; color:#000; border:none; padding:5px 8px; border-radius:5px; margin-top:4px; cursor:pointer;">📍 Cómo llegar</button>
-                </div>`;
-            });
-        }
-
-        // Añadir redes sociales al popup
-        let redesHTML = '';
-        if (ed.redes) {
-            redesHTML += `<div style="margin-top:8px; border-top:1px solid #eee; padding-top:6px;"><strong>Redes:</strong><br>`;
-            if (ed.redes.facebook) redesHTML += `<a href="${ed.redes.facebook}" target="_blank" style="margin-right:5px;">📘 Facebook</a>`;
-            if (ed.redes.instagram) redesHTML += `<a href="${ed.redes.instagram}" target="_blank">📸 Instagram</a>`;
-            redesHTML += `</div>`;
-        }
-        
-        const popupContent = `<strong>${ed.nombre}</strong><br><span class="categoria-tag" style="background:${c.color};">${c.icon} ${c.label}</span>${eventosHTML}${redesHTML}`;
+        const popupContent = `<strong>${ed.nombre}</strong><br><span class="categoria-tag" style="background:${c.color};">${c.icon} ${c.label}</span>`;
         const marker = L.marker([ed.lat, ed.lng], { icon: crearIcono(cat, esSede) })
             .addTo(map)
             .bindPopup(popupContent);
@@ -2042,38 +1911,7 @@ eventosMapaDemo.forEach(ev => {
         item.innerHTML = `<span class="leyenda-dot" style="background:${c.color};"></span>${c.icon} ${c.label}`;
         leyendaEl.appendChild(item);
     });
-// Función para ir a un evento o emprendedor desde el GPS
-function irAEvento(lat, lng, nombreDestino) {
-    const destinoEvento = { nombre: nombreDestino, lat: lat, lng: lng };
-    
-    if (!userLocation) {
-        alert('Primero presiona "📍 Mi ubicación (GPS)" para calcular tu ruta.');
-        return;
-    }
-    planificarRuta(userLocation, destinoEvento);
-}
-// ===============================================
-// LÓGICA DE LOS BOTONES DE FILTRO (EVENTOS / PASANTÍAS)
-// ===============================================
-document.getElementById('btnFiltroEventos').addEventListener('click', function() {
-    if (map.hasLayer(capaEventos)) {
-        map.removeLayer(capaEventos);
-        this.style.opacity = '0.5'; // Botón apagado
-    } else {
-        capaEventos.addTo(map);
-        this.style.opacity = '1'; // Botón encendido
-    }
-});
 
-document.getElementById('btnFiltroPasantias').addEventListener('click', function() {
-    if (map.hasLayer(capaPasantias)) {
-        map.removeLayer(capaPasantias);
-        this.style.opacity = '0.5'; // Botón apagado
-    } else {
-        capaPasantias.addTo(map);
-        this.style.opacity = '1'; // Botón encendido
-    }
-});
     // -------------------------------------------------------------
     // 4. SELECTOR DE EDIFICIOS
     // -------------------------------------------------------------
@@ -2117,202 +1955,233 @@ document.getElementById('btnFiltroPasantias').addEventListener('click', function
 
     // ===============================================================
     // INTERACCIÓN TÁCTIL DEL MAPA
-   // ===============================================================
-// ===============================================================
-// PASO 5: Función para resetear la rotación al Norte
-function resetRotacionMapa() {
-    // Intentamos rotar suavemente si el plugin está activo, si no, no hacemos nada para no dar error
-    if (typeof map.setBearing === 'function') {
-        map.setBearing(0, { animate: true });
-        console.log('🔄 Mapa rotado de vuelta al Norte (0°)');
-    } else {
-        console.warn('El plugin de rotación no cargó. Solo se vuelve a centrar el mapa.');
-        // Alternativa segura: volver a centrar el mapa sin rotar
-        map.setView(map.getCenter(), map.getZoom(), { animate: true });
-    }
-}
-// ===============================================================
-// PASO 6: HEADING - Botón de brújula para volver al Norte
-// ===============================================================
-(function() {
-    // Verificar que el mapa existe
-    if (typeof map === 'undefined') {
-        console.warn('El mapa aún no está definido. Esperando...');
-        return;
+    // ===============================================================
+    const mapElement = document.getElementById('mapid');
+    let pulsacionMapaId = null;
+    let inicioPulsacionMapa = null;
+    let gestoRotacion = null;
+    let rotacionMapaGrados = 0;
+
+    function obtenerLatLngDesdeToque(toque) {
+        const rect = mapElement.getBoundingClientRect();
+        return map.containerPointToLatLng(L.point(toque.clientX - rect.left, toque.clientY - rect.top));
     }
 
-    // 1. Crear el control personalizado de Leaflet (el botón flotante)
-    const BrújulaControl = L.Control.extend({
-        options: {
-            position: 'topright' // Lo colocamos en la esquina superior derecha (donde suele estar Google Maps)
-        },
-        onAdd: function(map) {
-            // Crear el contenedor del botón
-            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-            
-            // Crear el botón en sí
-            const button = L.DomUtil.create('a', 'leaflet-control-button', container);
-            button.innerHTML = '🧭'; // Icono de brújula
-            button.href = '#';
-            button.title = 'Volver al norte (0°)';
-            
-            // Estilos para que se vea bonito y se integre con Leaflet
-            button.style.fontSize = '20px';
-            button.style.fontWeight = 'bold';
-            button.style.background = 'white';
-            button.style.display = 'flex';
-            button.style.alignItems = 'center';
-            button.style.justifyContent = 'center';
-            button.style.width = '34px';
-            button.style.height = '34px';
-            button.style.textDecoration = 'none';
-            button.style.color = '#333';
-            button.style.borderRadius = '4px';
-            button.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
-            button.style.border = '1px solid #ccc';
-            button.style.cursor = 'pointer';
-            button.style.transition = 'background 0.2s ease';
+    function anguloEntreToques(a, b) {
+        return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    }
 
-            // Efecto hover (cuando pasas el mouse por encima)
-            button.addEventListener('mouseenter', function() {
-                this.style.background = '#f4f4f4';
-            });
-            button.addEventListener('mouseleave', function() {
-                this.style.background = 'white';
-            });
-
-            // --- ACCIÓN DEL BOTÓN: Resetear la rotación al norte ---
-            L.DomEvent.on(button, 'click', function(e) {
-                L.DomEvent.stopPropagation(e);
-                L.DomEvent.preventDefault(e);
-
-                // Llamar a la función de reseteo que creamos en el Paso 5
-                if (typeof resetRotacionMapa === 'function') {
-                    // Pequeño feedback: cambiar el ícono temporalmente
-                    button.innerHTML = '⬆'; // Flecha hacia arriba
-                    button.style.transform = 'scale(0.9)';
-                    
-                    // Llamar a la función que resetea la rotación
-                    resetRotacionMapa();
-                    
-                    // Restaurar el ícono y el tamaño después de 600ms
-                    setTimeout(() => {
-                        button.innerHTML = '🧭';
-                        button.style.transform = 'scale(1)';
-                    }, 600);
-                } else {
-                    alert('⚠️ La función de rotación aún no está disponible. Asegúrate de haber completado el Paso 5.');
-                }
-            });
-
-            return container;
+    function seleccionarPuntoCercano(latlng) {
+        let masCercano = null;
+        let menorDistancia = Infinity;
+        edificios.forEach(function(edificio) {
+            const distanciaEdificio = distancia(latlng.lat, latlng.lng, edificio.lat, edificio.lng) * 1000;
+            if (distanciaEdificio < menorDistancia) {
+                menorDistancia = distanciaEdificio;
+                masCercano = edificio;
+            }
+        });
+        if (!masCercano || menorDistancia > 120) {
+            mostrarToastCerca('Mantén presionado cerca de un edificio para seleccionarlo.');
+            return;
         }
-    });
+        select.value = String(masCercano.id);
+        select.dispatchEvent(new Event('change'));
+        mostrarToastCerca('📍 Destino seleccionado: ' + masCercano.nombre.replace(/^↪\s*/, ''));
+    }
 
-    // 2. Agregar el control al mapa
-    const brújula = new BrújulaControl();
-    brújula.addTo(map);
+    mapElement.addEventListener('touchstart', function(event) {
+        if (event.touches.length === 2) {
+            if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
+            gestoRotacion = {
+                anguloInicial: anguloEntreToques(event.touches[0], event.touches[1]),
+                rotacionInicial: rotacionMapaGrados
+            };
+            return;
+        }
+        if (event.touches.length !== 1) return;
+        const toque = event.touches[0];
+        inicioPulsacionMapa = { x: toque.clientX, y: toque.clientY };
+        pulsacionMapaId = setTimeout(function() {
+            seleccionarPuntoCercano(obtenerLatLngDesdeToque(toque));
+            pulsacionMapaId = null;
+        }, 650);
+    }, { passive: true });
 
-    console.log('✅ PASO 6: Heading (brújula) activado. Haz clic en el botón 🧭 para volver al norte.');
-})();
+    mapElement.addEventListener('touchmove', function(event) {
+        if (event.touches.length === 1 && inicioPulsacionMapa) {
+            const toque = event.touches[0];
+            const seMovio = Math.hypot(toque.clientX - inicioPulsacionMapa.x, toque.clientY - inicioPulsacionMapa.y);
+            if (seMovio > 12 && pulsacionMapaId) {
+                clearTimeout(pulsacionMapaId);
+                pulsacionMapaId = null;
+            }
+        }
+        if (event.touches.length !== 2 || !gestoRotacion) return;
+        event.preventDefault();
+        const delta = anguloEntreToques(event.touches[0], event.touches[1]) - gestoRotacion.anguloInicial;
+        rotacionMapaGrados = gestoRotacion.rotacionInicial + delta;
+        mapElement.style.transformOrigin = 'center center';
+        mapElement.style.transform = 'rotate(' + rotacionMapaGrados + 'deg)';
+    }, { passive: false });
+
+    mapElement.addEventListener('touchend', function(event) {
+        if (pulsacionMapaId) {
+            clearTimeout(pulsacionMapaId);
+            pulsacionMapaId = null;
+        }
+        inicioPulsacionMapa = null;
+        if (event.touches.length < 2) gestoRotacion = null;
+    }, { passive: true });
+    mapElement.addEventListener('touchcancel', function() {
+        if (pulsacionMapaId) clearTimeout(pulsacionMapaId);
+        pulsacionMapaId = null;
+        inicioPulsacionMapa = null;
+        gestoRotacion = null;
+    }, { passive: true });
 
     // ===============================================================
-// ESTADÍSTICAS GLOBALES CON SUPABASE (Corregido - Sin error 400)
-// ===============================================================
-const SUPABASE_URL = 'https://yvnxhnkapamcavmiaxmb.supabase.co/rest/v1/';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bnhobmthcGFtY2F2bWlheG1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMjk1NDMsImV4cCI6MjEwMzgwNTU0M30.bRhjxGbC1xbU-XvWoGSKktULiyJdph3jpJDINLqLh1Q';
+    // ESTADÍSTICAS: caché local de respaldo + API global de Supabase
+    // ===============================================================
+    const ESTADISTICAS_API = 'https://uagrmlocalizacio-production.up.railway.app/api/visits';
+    let estadisticasGlobales = null;
 
-function obtenerVisitas() {
-    try { return JSON.parse(localStorage.getItem('uagrm_visitas_modulos') || '{}'); } catch(e) { return {}; }
-}
+    function obtenerVisitas() {
+        try {
+            return JSON.parse(localStorage.getItem('uagrm_visitas_modulos') || '{}');
+        } catch(e) { return {}; }
+    }
 
-async function cargarEstadisticasGlobales() {
-    // Sin cabeceras para evitar el bloqueo de CORS del navegador
-    const respuesta = await fetch(`${SUPABASE_URL}uagrm_visitas?select=*`);
-    if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas globales.');
-    const datos = await respuesta.json();
-    
-    // Sumamos las visitas de cada módulo
-    const agregado = {};
-    datos.forEach(item => {
-        const id = item.modulo_id;
-        if (!agregado[id]) agregado[id] = { modulo_nombre: item.modulo_nombre, visitas: 0 };
-        agregado[id].visitas += Number(item.visitas || 0);
-    });
-    
-    const entries = Object.values(agregado).sort((a, b) => b.visitas - a.visitas);
-    return { entries: entries, totalVisits: entries.reduce((sum, e) => sum + e.visitas, 0) };
-}
+    function incrementarVisita(moduloId, moduloNombre) {
+        // Se conserva un respaldo local para que la interfaz no quede vacía
+        // si la API está temporalmente fuera de línea. No se presenta como
+        // estadística global.
+        const visitas = obtenerVisitas();
+        if (!visitas[moduloId]) {
+            visitas[moduloId] = { nombre: moduloNombre, count: 0 };
+        }
+        visitas[moduloId].count++;
+        visitas[moduloId].nombre = moduloNombre;
+        localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
 
-async function incrementarVisita(moduloId, moduloNombre) {
-    // Enviar a Supabase (global) - POST SIMPLE (sin cabeceras para CORS)
-    try {
-        const respuestaGuardado = await fetch(`${SUPABASE_URL}uagrm_visitas`, {
+        fetch(ESTADISTICAS_API, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify([{ modulo_id: moduloId, modulo_nombre: moduloNombre, visitas: 1 }])
+            body: JSON.stringify({ moduloId: moduloId, moduloNombre: moduloNombre })
+        }).then(function(respuesta) {
+            if (respuesta.ok) {
+                estadisticasGlobales = null;
+            }
+        }).catch(function(error) {
+            console.warn('No se pudo registrar la visita global:', error);
         });
-        if (respuestaGuardado.ok) {
-            console.log('✅ Visita guardada correctamente en Supabase.');
-        } else {
-            console.error('❌ Error al guardar en Supabase:', respuestaGuardado.status);
-        }
-    } catch (e) { console.error('❌ NO SE PUDO CONECTAR CON SUPABASE:', e); }
-}
+    }
 
-function mostrarEstadisticas() {
-    document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
-    document.getElementById('estadisticasFuente').textContent = 'Cargando estadísticas globales…';
-    
-    cargarEstadisticasGlobales().then(datos => {
-        const totalVisitas = Number(datos.totalVisits) || 0;
-        const entradas = datos.entries;
-        const masVisitado = entradas.find(e => Number(e.visitas) > 0);
+    function combinarRankingConEdificios(entradasGlobales) {
+        const porId = {};
+        (entradasGlobales || []).forEach(function(entry) {
+            porId[Number(entry.modulo_id)] = {
+                nombre: entry.modulo_nombre || '',
+                count: Number(entry.visitas) || 0,
+                ultimaVisita: entry.ultima_visita || null
+            };
+        });
+        return edificios.map(function(edificio) {
+            const visita = porId[edificio.id] || {};
+            return {
+                nombre: visita.nombre || edificio.nombre,
+                count: visita.count || 0,
+                ultimaVisita: visita.ultimaVisita || null
+            };
+        }).sort(function(a, b) {
+            return b.count - a.count || a.nombre.localeCompare(b.nombre);
+        });
+    }
+
+    function renderizarRanking(entradas, totalVisitas, fuente, esError) {
+        const rankingLista = document.getElementById('rankingLista');
+        rankingLista.innerHTML = '';
+
+        document.getElementById('estadisticasFuente').textContent = fuente;
+        document.getElementById('estadisticasFuente').classList.toggle('error', Boolean(esError));
+        const moduloMasVisitado = entradas.find(function(entry) { return entry.count > 0; });
         document.getElementById('totalVisitas').textContent = totalVisitas;
-        document.getElementById('moduloMasVisitado').textContent = masVisitado ? masVisitado.modulo_nombre : '—';
-        
-        const lista = document.getElementById('rankingLista');
-        lista.innerHTML = '';
-        if (totalVisitas === 0) {
-            lista.innerHTML = '<div class="ranking-vacio">Aún no hay visitas globales.</div>';
-        } else {
-            entradas.forEach((entry, i) => {
-                const item = document.createElement('div');
-                item.className = 'ranking-item';
-                const clase = (i === 0) ? 'top-1' : (i === 1) ? 'top-2' : (i === 2) ? 'top-3' : '';
-                const max = entradas[0].visitas;
-                const porcentaje = Math.round((Number(entry.visitas) / max) * 100);
-                item.innerHTML = 
-                    '<div class="ranking-posicion ' + clase + '">' + (i + 1) + '</div>' +
-                    '<div class="ranking-info">' +
-                        '<div class="ranking-nombre">' + entry.modulo_nombre + '</div>' +
-                        '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
-                    '</div>' +
-                    '<div class="ranking-visitas">' + entry.visitas + ' visitas</div>';
-                lista.appendChild(item);
-            });
+        document.getElementById('moduloMasVisitado').textContent = moduloMasVisitado
+            ? moduloMasVisitado.nombre.replace(/^↪\s*/, '')
+            : '—';
+
+        const maxVisitas = entradas[0] ? entradas[0].count : 0;
+        entradas.forEach(function(entry, i) {
+            const posicion = i + 1;
+            const item = document.createElement('div');
+            item.className = 'ranking-item';
+            const clasePos = posicion <= 3 ? 'top-' + posicion : '';
+            const porcentaje = maxVisitas ? Math.round((entry.count / maxVisitas) * 100) : 0;
+            item.innerHTML =
+                '<div class="ranking-posicion ' + clasePos + '">' + posicion + '</div>' +
+                '<div class="ranking-info">' +
+                    '<div class="ranking-nombre">' + entry.nombre + '</div>' +
+                    '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
+                '</div>' +
+                '<div class="ranking-visitas">' + entry.count + ' ' + (entry.count === 1 ? 'visita' : 'visitas') + '</div>';
+            rankingLista.appendChild(item);
+        });
+
+        document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
+    }
+
+    async function cargarEstadisticasGlobales() {
+        const respuesta = await fetch(ESTADISTICAS_API, { headers: { 'Accept': 'application/json' } });
+        const datos = await respuesta.json();
+        if (!respuesta.ok || !datos.ok) {
+            throw new Error(datos.message || 'No se pudieron cargar las estadísticas globales.');
         }
-        document.getElementById('estadisticasFuente').textContent = 'Datos globales en vivo (Supabase)';
+        estadisticasGlobales = datos;
+        return datos;
+    }
 
-    }).catch(error => {
-        // Si falla, solo muestra error (NO datos locales)
-        console.error('No se pudieron cargar los globales:', error);
-        document.getElementById('estadisticasFuente').textContent = '⚠️ Error al conectar con la base de datos global.';
-        document.getElementById('totalVisitas').textContent = '0';
-        document.getElementById('moduloMasVisitado').textContent = '—';
-        const lista = document.getElementById('rankingLista');
-        lista.innerHTML = '<div class="ranking-vacio">No se pudo cargar la información global. Revisa tu conexión.</div>';
+    async function mostrarEstadisticas() {
+        document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
+        document.getElementById('estadisticasFuente').textContent = 'Cargando estadísticas globales…';
+        document.getElementById('estadisticasFuente').classList.remove('error');
+        document.getElementById('rankingLista').innerHTML = '<div class="ranking-vacio">Consultando visitas compartidas…</div>';
+        try {
+            const datos = estadisticasGlobales || await cargarEstadisticasGlobales();
+            const ultimaActualizacion = datos.fetchedAt
+                ? new Date(datos.fetchedAt).toLocaleString('es-BO')
+                : 'ahora';
+            renderizarRanking(
+                combinarRankingConEdificios(datos.entries),
+                Number(datos.totalVisits) || 0,
+                'Datos globales · actualizado ' + ultimaActualizacion,
+                false
+            );
+        } catch (error) {
+            console.warn('Estadísticas globales no disponibles:', error);
+            const visitas = obtenerVisitas();
+            const respaldo = edificios.map(function(edificio) {
+                const visita = visitas[edificio.id] || {};
+                return { nombre: edificio.nombre, count: Number(visita.count) || 0 };
+            }).sort(function(a, b) {
+                return b.count - a.count || a.nombre.localeCompare(b.nombre);
+            });
+            const totalRespaldo = respaldo.reduce(function(total, entry) { return total + entry.count; }, 0);
+            renderizarRanking(
+                respaldo,
+                totalRespaldo,
+                'Sin conexión global; mostrando solo este dispositivo',
+                true
+            );
+        }
+    }
+
+    document.getElementById('btnEstadisticas').addEventListener('click', mostrarEstadisticas);
+    document.getElementById('btnCerrarEstadisticas').addEventListener('click', function() {
+        document.getElementById('modalEstadisticasOverlay').classList.add('hidden');
     });
-}
-
-// Botones de cerrar y abrir
-document.getElementById('btnEstadisticas').addEventListener('click', mostrarEstadisticas);
-document.getElementById('btnCerrarEstadisticas').addEventListener('click', function() {
-    document.getElementById('modalEstadisticasOverlay').classList.add('hidden');
-});
-document.getElementById('modalEstadisticasOverlay').addEventListener('click', function(e) {
-    if (e.target === this) this.classList.add('hidden');
-});
+    document.getElementById('modalEstadisticasOverlay').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.add('hidden');
+    });
 
 
     // -------------------------------------------------------------
@@ -2651,139 +2520,66 @@ document.getElementById('modalEstadisticasOverlay').addEventListener('click', fu
         return { lila: coords.slice(0, -1), roja: coords.slice(-2) };
     }
 
- // Fábrica de curvas casera (no necesita internet, no falla)
-function suavizarRuta(puntos, pasos) {
-    if (!puntos || puntos.length < 3) return puntos;
-    pasos = pasos || 6; // Suavidad de la curva
-    var nuevosPuntos = [puntos[0]];
-    for (var i = 0; i < puntos.length - 1; i++) {
-        var p0 = puntos[i === 0 ? 0 : i - 1];
-        var p1 = puntos[i];
-        var p2 = puntos[i + 1];
-        var p3 = puntos[i + 2 < puntos.length ? i + 2 : puntos.length - 1];
-        for (var t = 1; t < pasos; t++) {
-            var t1 = t / pasos;
-            var t2 = t1 * t1;
-            var t3 = t2 * t1;
-            var lat = 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * t1 + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
-            var lng = 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * t1 + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
-            nuevosPuntos.push(L.latLng(lat, lng));
-        }
-        nuevosPuntos.push(p2);
-    }
-    return nuevosPuntos;
-}
+    function dibujarRuta(coords, ajustarVista) {
+        limpiarCapaRuta();
+        const tramos = dividirRutaPorTramoFinal(coords, 30);
+        const capasRuta = [];
 
-// Función para calcular el punto en el borde de un círculo, apuntando hacia otro punto
-function puntoEnBorde(latCentro, lngCentro, latOtro, lngOtro, radioMetros) {
-    const R = 6371000; // Radio de la tierra en metros
-    const dLat = (latOtro - latCentro) * Math.PI / 180;
-    const dLng = (lngOtro - lngCentro) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(latCentro * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180) * Math.sin(dLng/2)**2;
-    const distancia = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // distancia en metros
-    if (distancia === 0) return [latCentro, lngCentro]; // están en el mismo punto
-
-    // Ángulo (bearing) desde el centro hacia el otro punto
-    const y = Math.sin((lngOtro - lngCentro) * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180);
-    const x = Math.cos(latCentro * Math.PI / 180) * Math.sin(latOtro * Math.PI / 180) - 
-              Math.sin(latCentro * Math.PI / 180) * Math.cos(latOtro * Math.PI / 180) * Math.cos((lngOtro - lngCentro) * Math.PI / 180);
-    const angulo = Math.atan2(y, x); // ángulo en radianes
-
-    // Coordenadas del punto en el borde (a radioMetros del centro, en dirección al otro punto)
-    const latBorde = latCentro + (radioMetros / R) * (180 / Math.PI) * Math.sin(angulo) / Math.cos(latCentro * Math.PI / 180);
-    const lngBorde = lngCentro + (radioMetros / R) * (180 / Math.PI) * Math.cos(angulo);
-
-    return [latBorde, lngBorde];
-}
-
-function dibujarRuta(coords, ajustarVista) {
-    limpiarCapaRuta();
-    const capasRuta = [];
-
-    // Definir los círculos grandes (radio en metros)
-    const RADIO_EDIFICIO = 25;  // Ajusta este valor para que abarque el tamaño del edificio
-    const RADIO_USUARIO = 15;    // Radio del círculo del usuario
-
-    let puntoInicioLila = null;
-    let puntoFinLila = null;
-
-    // Obtener el centro del edificio (destino real) o el último punto de la ruta
-    const centroEdificio = (window.destinoActual && window.destinoActual.lat) 
-        ? { lat: window.destinoActual.lat, lng: window.destinoActual.lng } 
-        : coords[coords.length - 1];
-
-    // Obtener la ubicación del usuario
+        if (tramos.lila.length >= 2) {
+    // Unir la ruta con el GPS del estudiante en tiempo real
     if (userLocation && userLocation.lat && userLocation.lng) {
-        // 1. Círculo VERDE del USUARIO
-        capasRuta.push(L.circle([userLocation.lat, userLocation.lng], {
-            radius: RADIO_USUARIO,
-            color: '#0B6E4F', // Verde
-            fillColor: '#0B6E4F',
-            fillOpacity: 0.2,
-            weight: 3
-        }));
-
-        // 2. Calcular el punto de inicio en el BORDE del círculo del usuario hacia el edificio
-        puntoInicioLila = puntoEnBorde(userLocation.lat, userLocation.lng, centroEdificio.lat, centroEdificio.lng, RADIO_USUARIO);
+        tramos.lila.push([userLocation.lat, userLocation.lng]);
     }
 
-    // 3. Círculo ROJO del EDIFICIO (centrado en el edificio real)
-    capasRuta.push(L.circle([centroEdificio.lat, centroEdificio.lng], {
-        radius: RADIO_EDIFICIO,
-        color: '#F0183D', // Rojo
-        fillColor: '#F0183D',
-        fillOpacity: 0.2,
-        weight: 3
+    // Línea de borde blanca
+    capasRuta.push(L.curve(crearCurva(tramos.lila), {
+        color: '#ffffff',
+        weight: 10,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round'
     }));
 
-    // 4. Calcular el punto final en el BORDE del círculo del edificio hacia el usuario
-    if (puntoInicioLila) {
-        puntoFinLila = puntoEnBorde(centroEdificio.lat, centroEdificio.lng, userLocation.lat, userLocation.lng, RADIO_EDIFICIO);
-    }
-
-    // 5. Dibujar la LÍNEA LILA desde el borde del usuario hasta el borde del edificio
-    if (puntoInicioLila && puntoFinLila) {
-        // Copiamos la ruta calculada (si existe) y reemplazamos el primer y último punto
-        let puntosRuta = [];
-        if (coords && coords.length > 1) {
-            puntosRuta = coords.slice(); // copiamos la ruta
-            // Reemplazamos el primer punto por el borde del usuario
-            puntosRuta[0] = L.latLng(puntoInicioLila[0], puntoInicioLila[1]);
-            // Reemplazamos el último punto por el borde del edificio
-            puntosRuta[puntosRuta.length - 1] = L.latLng(puntoFinLila[0], puntoFinLila[1]);
-        } else {
-            // Si no hay ruta (o es muy corta), dibujamos una simple línea recta entre los bordes
-            puntosRuta = [L.latLng(puntoInicioLila[0], puntoInicioLila[1]), L.latLng(puntoFinLila[0], puntoFinLila[1])];
-        }
-
-        // Suavizar la ruta (para que se vea bonita)
-        const puntosCurva = suavizarRuta(puntosRuta, 6);
-
-        // Línea de borde blanca (para que resalte)
-        capasRuta.push(L.polyline(puntosCurva, {
-            color: '#ffffff',
-            weight: 10,
-            opacity: 0.98,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-
-        // Línea lila principal
-        capasRuta.push(L.polyline(puntosCurva, {
-            color: '#A855F7',
-            weight: 6,
-            opacity: 1,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }));
-    }
-
-    // Agregar todas las capas al mapa
-    window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
-    if (ajustarVista && coords.length > 1) {
-        map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
-    }
+    // Línea lila principal
+    capasRuta.push(L.curve(crearCurva(tramos.lila), {
+        color: '#A855F7',
+        weight: 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
 }
+
+if (tramos.roja.length >= 2) {
+    // Unir la ruta con el GPS del estudiante en tiempo real
+    if (userLocation && userLocation.lat && userLocation.lng) {
+        tramos.roja.push([userLocation.lat, userLocation.lng]);
+    }
+
+    // Línea de borde blanca
+    capasRuta.push(L.curve(crearCurva(tramos.roja), {
+        color: '#ffffff',
+        weight: 10,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+
+    // Línea roja principal
+    capasRuta.push(L.curve(crearCurva(tramos.roja), {
+        color: '#F0183D',
+        weight: 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }));
+}
+
+        window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
+        if (ajustarVista && coords.length > 1) {
+            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
+        }
+    }
 
     function crearRutaDirecta(originLatLng, destino, distanciaMetros) {
         const origen = L.latLng(originLatLng.lat, originLatLng.lng);
@@ -2834,17 +2630,8 @@ function dibujarRuta(coords, ajustarVista) {
             statusMsg.textContent = '⚠️ Primero selecciona un edificio destino.';
             return;
         }
-        window.destinoActual = destino;
+        destinoActual = destino;
         const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
-// AÑADIDO: Si estás fuera del campus, no calculamos rutas internas.
-const distanciaSenderos = distanciaMinimaASenderos(originLatLng.lat, originLatLng.lng);
-if (distanciaSenderos > UMBRAL_FUERA_CAMPUS_METROS) {
-    statusMsg.innerHTML = '⚠️ Estás fuera del campus. Las rutas peatonales solo están disponibles dentro del campus.';
-    document.getElementById('infoPanel').classList.remove('solo-boton');
-    btnIniciarRutaPie.classList.add('hidden');
-    limpiarCapaRuta();
-    return;
-}
 
         // AÑADIDO PARA RECÁLCULO AUTOMÁTICO: cuando esta ruta se calcula
         // porque el usuario se desvió del sendero (no porque acaba de
@@ -3478,60 +3265,6 @@ if (distanciaSenderos > UMBRAL_FUERA_CAMPUS_METROS) {
         });
 
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
-// ===============================================================
-// PASO 8: MAP ID VECTORIAL - Configuración central de funciones
-// ===============================================================
-(function() {
-    // Esta variable centraliza TODAS las funcionalidades que has activado
-    // Así puedes activar o desactivar cada una con solo cambiar 'true' a 'false'
-    const MAP_CONFIG = {
-        id: 'uagrm-campus-map',
-        version: '1.0.0',
-        features: {
-            rotateEnabled: true,        // Rotación con dos dedos
-            tiltEnabled: true,          // Inclinación 3D (tilt)
-            inertiaEnabled: true,       // Inercia al soltar
-            headingEnabled: true,       // Botón de brújula
-            gestureHandlingEnabled: true // Distingue zoom de rotación
-        },
-        limits: {
-            maxTilt: 60,                // Grados máximos de inclinación
-            minTilt: 0,                // Grados mínimos de inclinación
-            inertiaDeceleration: 0.96,  // Fricción de la inercia (0.90-0.99)
-            rotationSensitivity: 1.0    // Sensibilidad de rotación (0.5-2.0)
-        }
-    };
-
-    // Mostrar en consola la configuración activa (para verificar que todo está bien)
-    console.log('✅ PASO 8: Map ID Vectorial configurado correctamente.');
-    console.log('📋 Configuración activa:', MAP_CONFIG);
-    console.log('🔧 Funcionalidades activadas:');
-    for (const [key, value] of Object.entries(MAP_CONFIG.features)) {
-        console.log(`   - ${key}: ${value ? '✅ Activado' : '❌ Desactivado'}`);
-    }
-    console.log('📐 Límites:', MAP_CONFIG.limits);
-
-    // --- FUNCIÓN DE UTILIDAD: puedes llamar a esta función desde la consola
-    // para ver el estado actual del mapa
-    window.getMapConfig = function() {
-        return MAP_CONFIG;
-    };
-
-    // --- FUNCIÓN PARA CAMBIAR CONFIGURACIÓN EN TIEMPO REAL (opcional)
-    // Ejemplo: setMapFeature('tiltEnabled', false) desactiva el tilt
-    window.setMapFeature = function(featureName, value) {
-        if (MAP_CONFIG.features.hasOwnProperty(featureName)) {
-            MAP_CONFIG.features[featureName] = value;
-            console.log(`✅ Característica '${featureName}' cambiada a: ${value}`);
-            console.log('⚠️ Algunos cambios requieren recargar la página para aplicarse completamente.');
-        } else {
-            console.warn(`❌ La característica '${featureName}' no existe. Opciones disponibles:`, Object.keys(MAP_CONFIG.features));
-        }
-    };
-
-    console.log('💡 Para ver la configuración en cualquier momento, escribe en la consola: getMapConfig()');
-    console.log('💡 Para cambiar una función, escribe: setMapFeature("tiltEnabled", false)');
-})();
 </script>
 
 </body>
