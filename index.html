@@ -2256,17 +2256,24 @@ async function incrementarVisita(moduloId, moduloNombre) {
     localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
 
     // Enviar a Supabase (global) - POST SIMPLE (esto arregla el error 400)
-    try {
-        await fetch(`${SUPABASE_URL}uagrm_visitas`, {
+        try {
+        const respuestaGuardado = await fetch(`${SUPABASE_URL}uagrm_visitas`, {
             method: 'POST',
             headers: {
                 apikey: SUPABASE_KEY,
                 Authorization: `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
             },
             body: JSON.stringify([{ modulo_id: moduloId, modulo_nombre: moduloNombre, visitas: 1 }])
         });
-    } catch (e) { console.warn('No se pudo enviar visita global:', e); }
+        if (!respuestaGuardado.ok) {
+            const detalleError = await respuestaGuardado.text();
+            console.error('❌ SUPABASE RECHAZÓ EL GUARDADO (código ' + respuestaGuardado.status + '):', detalleError);
+        } else {
+            console.log('✅ Visita guardada correctamente en Supabase.');
+        }
+        } catch (e) { console.error('❌ NO SE PUDO CONECTAR CON SUPABASE:', e); }
 }
 
 function mostrarEstadisticas() {
