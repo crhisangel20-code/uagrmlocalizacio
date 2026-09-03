@@ -1082,7 +1082,7 @@
             .btn-ingresar { padding: 12px 24px; }
         }
     </style>
-    <script src="https://unpkg.com/leaflet-curve@0.2.0/dist/leaflet.curve.js"></script>
+    
 </head>
 <body>
 
@@ -1240,20 +1240,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
  <script>
-    // Función para transformar líneas rectas en curvas suaves (estilo Google Maps)
-    function crearCurva(puntos) {
-        if (!puntos || puntos.length < 2) return "";
-        let d = `M ${puntos[0][1]} ${puntos[0][0]}`; 
-        for (let i = 1; i < puntos.length; i++) {
-            const prev = puntos[i-1];
-            const curr = puntos[i];
-            const midX = (prev[1] + curr[1]) / 2;
-            const midY = (prev[0] + curr[0]) / 2;
-            d += ` Q ${midX} ${midY} ${curr[1]} ${curr[0]}`;
-        }
-        return d;
-    }
-
+  
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
     function enviarEventoGA4(nombreEvento, datos) { // AÑADIDO PARA GA4
         if (typeof gtag === 'function') {
@@ -2205,6 +2192,8 @@
     let userLocation = null;
     let destinoActual = null;
     let watchId = null;
+    let circuloGPS = null;
+    let circuloDestino = null;
     let modoNavegacionActivo = false; // AÑADIDO PARA OPENROUTESERVICE
     let tipoRutaActual = null;
     let ultimaPosicionCalculoRuta = null;
@@ -2521,90 +2510,55 @@
     }
 
     function dibujarRuta(coords, ajustarVista) {
-        limpiarCapaRuta();
-        const tramos = dividirRutaPorTramoFinal(coords, 30);
-        const capasRuta = [];
+    limpiarCapaRuta();
+    const tramos = dividirRutaPorTramoFinal(coords, 30);
+    const capasRuta = [];
 
-        if (tramos.lila.length >= 2) {
-    // Unir la ruta con el GPS del estudiante en tiempo real
-    if (userLocation && userLocation.lat && userLocation.lng) {
-        tramos.lila.push([userLocation.lat, userLocation.lng]);
+    if (tramos.lila.length >= 2) {
+        // Convertir coordenadas a formato [[lat, lng], ...]
+        const puntosLila = tramos.lila.map(p => [p.lat, p.lng]);
+        // Línea de borde blanca
+        capasRuta.push(L.polyline(puntosLila, {
+            color: '#ffffff',
+            weight: 10,
+            opacity: 0.98,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+        // Línea lila principal
+        capasRuta.push(L.polyline(puntosLila, {
+            color: '#A855F7',
+            weight: 6,
+            opacity: 1,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
     }
 
-    // Línea de borde blanca
-    capasRuta.push(L.curve(crearCurva(tramos.lila), {
-        color: '#ffffff',
-        weight: 10,
-        opacity: 0.98,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-
-    // Línea lila principal
-    capasRuta.push(L.curve(crearCurva(tramos.lila), {
-        color: '#A855F7',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-}
-
-if (tramos.roja.length >= 2) {
-    // Unir la ruta con el GPS del estudiante en tiempo real
-    if (userLocation && userLocation.lat && userLocation.lng) {
-        tramos.roja.push([userLocation.lat, userLocation.lng]);
+    if (tramos.roja.length >= 2) {
+        const puntosRoja = tramos.roja.map(p => [p.lat, p.lng]);
+        capasRuta.push(L.polyline(puntosRoja, {
+            color: '#ffffff',
+            weight: 10,
+            opacity: 0.98,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
+        capasRuta.push(L.polyline(puntosRoja, {
+            color: '#F0183D',
+            weight: 6,
+            opacity: 1,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }));
     }
 
-    // Línea de borde blanca
-    capasRuta.push(L.curve(crearCurva(tramos.roja), {
-        color: '#ffffff',
-        weight: 10,
-        opacity: 0.98,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-
-    // Línea roja principal
-    capasRuta.push(L.curve(crearCurva(tramos.roja), {
-        color: '#F0183D',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-}
-
+    if (capasRuta.length > 0) {
         window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
         if (ajustarVista && coords.length > 1) {
             map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
         }
     }
-
-    function crearRutaDirecta(originLatLng, destino, distanciaMetros) {
-        const origen = L.latLng(originLatLng.lat, originLatLng.lng);
-        const destinoLatLng = L.latLng(destino.lat, destino.lng);
-        return {
-            name: 'Ruta directa GPS',
-            tipo: 'directa',
-            coordinates: [origen, destinoLatLng],
-            pasos: [
-                { instruccion: 'Estás muy cerca, sigue recto hacia el punto rojo', distanciaMetros: Math.round(distanciaMetros) },
-                { instruccion: 'Has llegado a tu destino', distanciaMetros: 0 }
-            ],
-            summary: { totalDistance: distanciaMetros, totalTime: Math.round(distanciaMetros / 1.2) }
-        };
-    }
-
-    function actualizarRutaDirecta(originLatLng, destino, distanciaMetros, ajustarVista) {
-        const rutaDirecta = crearRutaDirecta(originLatLng, destino, distanciaMetros);
-        tipoRutaActual = 'directa';
-        window.rutaCoordsActuales = rutaDirecta.coordinates;
-        window.distanciaTotalRutaMetros = distanciaMetros;
-        dibujarRuta(rutaDirecta.coordinates, ajustarVista);
-        mostrarInstruccionesPeatonales(rutaDirecta.pasos, rutaDirecta.summary);
-    }
-
     function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
@@ -2691,7 +2645,26 @@ if (tramos.roja.length >= 2) {
             .addTo(map).bindPopup('📍 Origen').openPopup();
         window.destMarker = L.marker([destino.lat, destino.lng], { icon: iconoOrigenDestino('destino') })
             .addTo(map).bindPopup('🏁 Destino: ' + destino.nombre).openPopup();
+        // Círculo verde alrededor del GPS (radio 7.5 m = diámetro 15 m)
+if (circuloGPS) map.removeLayer(circuloGPS);
+circuloGPS = L.circle([originLatLng.lat, originLatLng.lng], {
+    radius: 7.5,
+    color: '#00cc44',
+    fillColor: '#00cc44',
+    fillOpacity: 0.3,
+    weight: 2
+}).addTo(map);
 
+// Círculo rojo alrededor del destino (radio 12.5 m = diámetro 25 m)
+if (circuloDestino) map.removeLayer(circuloDestino);
+circuloDestino = L.circle([destino.lat, destino.lng], {
+    radius: 12.5,
+    color: '#ff1744',
+    fillColor: '#ff1744',
+    fillOpacity: 0.2,
+    weight: 2,
+    dashArray: '4 4'
+}).addTo(map);
         const waypointsRuta = [
             { latLng: L.latLng(originLatLng.lat, originLatLng.lng) },
             { latLng: L.latLng(destino.lat, destino.lng) }
@@ -2751,15 +2724,19 @@ if (tramos.roja.length >= 2) {
         // Cerca del destino no se consulta la red de senderos: una ruta
         // basada en nodos puede obligar al usuario a dar vueltas aunque ya
         // esté prácticamente frente al edificio.
-        if (distanciaDirectaMetros <= UMBRAL_LLEGADA_METROS) {
-            finalizarRuta(destino, 15, distanciaDirectaMetros);
-            return;
-        }
-        if (distanciaDirectaMetros < DISTANCIA_RUTA_DIRECTA_METROS) {
-            completarRuta(null, [crearRutaDirecta(originLatLng, destino, distanciaDirectaMetros)]);
-        } else {
-            routerElegido.route(waypointsRuta, completarRuta, null);
-        }
+        if (distanciaDirectaMetros <= 100) {
+    // Tramo corto: sin ruta, solo círculos y marcadores
+    statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
+    btnIniciarRutaPie.classList.add('hidden');
+    panelInstrucciones.classList.add('hidden');
+    document.getElementById('infoPanel').classList.remove('solo-boton');
+    limpiarCapaRuta();
+    return;
+} else {
+    // Tramo largo: calcular ruta
+    statusMsg.innerHTML = '🚶 Calculando ruta...';
+    routerElegido.route(waypointsRuta, completarRuta, null);
+}
 
         // AÑADIDO PARA GA4: evento de ruta calculada
         enviarEventoGA4('ruta_calculada', { // AÑADIDO PARA GA4
@@ -2785,7 +2762,18 @@ if (tramos.roja.length >= 2) {
                 const userLat = pos.coords.latitude;
                 const userLng = pos.coords.longitude;
                 userLocation = { lat: userLat, lng: userLng };
-
+                // Actualizar círculo GPS
+ if (circuloGPS) {
+    circuloGPS.setLatLng([userLat, userLng]);
+} else {
+    circuloGPS = L.circle([userLat, userLng], {
+        radius: 7.5,
+        color: '#00cc44',
+        fillColor: '#00cc44',
+        fillOpacity: 0.3,
+        weight: 2
+    }).addTo(map);
+}
                 // AÑADIDO PARA OPENROUTESERVICE: si el usuario activó
                 // "Iniciar ruta a pie", seguimos su posición en vivo
                 // recentrando el mapa y moviendo el marcador de origen.
@@ -2806,20 +2794,17 @@ if (tramos.roja.length >= 2) {
                     finalizarRuta(destino, precisionGPS, distLineaRecta);
                     return;
                 }
-
-                // Entre 15 y 50 m la línea se actualiza con la posición GPS
-                // actual y nunca vuelve a entrar al algoritmo de senderos.
-                if (distLineaRecta < DISTANCIA_RUTA_DIRECTA_METROS) {
-                    actualizarRutaDirecta({ lat: userLat, lng: userLng }, destino, distLineaRecta, false);
-                    statusMsg.textContent = 'Estás muy cerca, sigue recto hacia el punto rojo';
-                    if (modoNavegacionActivo) btnIniciarRutaPie.classList.add('hidden');
-                    if (!window.alertaCercaMostrada) {
-                        mostrarToastCerca('Estás muy cerca, sigue recto hacia el punto rojo');
-                        window.alertaCercaMostrada = true;
-                    }
-                    return;
-                }
-
+		// Si la distancia es <= 100 m, no mostramos ruta, solo círculos
+if (distLineaRecta <= 100) {
+    if (window.capaRutaPeatonal) {
+        limpiarCapaRuta();
+        btnIniciarRutaPie.classList.add('hidden');
+        panelInstrucciones.classList.add('hidden');
+    }
+    statusMsg.innerHTML = '✅ Estás a ' + Math.round(distLineaRecta) + ' m del destino. Sigue los círculos.';
+    return;
+}
+                
                 // Si el usuario se aleja después de estar en el tramo
                 // directo, se reconstruye la ruta larga desde su GPS.
                 if (tipoRutaActual === 'directa') {
