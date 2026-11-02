@@ -2566,6 +2566,24 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
     const esRecalculoAutomatico = !!opts.recalculoAutomatico;
     const navegacionEstabaActivaAntes = modoNavegacionActivo;
     const distanciaDirectaMetros = dist * 1000;
+    // AÑADIDO: Si el usuario está lejos del campus (ej. Warnes), no calculamos la ruta interna
+    // para evitar el "garabato" visual de líneas. Solo permitimos rutas si está a 200m a la redonda.
+    const distanciaAlCampus = distanciaMinimaASenderos(originLatLng.lat, originLatLng.lng);
+    if (distanciaAlCampus > 200 && !esRecalculoAutomatico) {
+        statusMsg.innerHTML = '📍 Estás fuera del rango del campus. Usa el botón "🗺️ Cómo llegar a la UAGRM" del aviso amarillo para llegar primero.';
+        btnIniciarRutaPie.classList.add('hidden');
+        panelInstrucciones.classList.add('hidden');
+        limpiarCapaRuta();
+        
+        // Borramos el origen y destino anterior si quedaron dibujados
+        if (window.originMarker) { map.removeLayer(window.originMarker); window.originMarker = null; }
+        if (window.destMarker) { map.removeLayer(window.destMarker); window.destMarker = null; }
+        
+        // Centramos el mapa en el edificio destino para que el usuario vea dónde queda
+        map.setView([destino.lat, destino.lng], 18, { animate: true });
+        
+        return; // Detenemos la función aquí para que no dibuje el garabato
+    }
 
     if (!esRecalculoAutomatico) {
         modoNavegacionActivo = false;
