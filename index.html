@@ -1143,6 +1143,9 @@
             <button class="btn-google hidden" id="btnIniciarRutaPie" style="background: var(--verde-bandera);">
                 🚶 Iniciar ruta a pie
             </button>
+<button class="btn-google hidden" id="btnRecentrar" style="background: var(--verde-oscuro);">
+    📍 Centrar Mapa
+</button>
         </div>
 
         <!-- AÑADIDO PARA OPENROUTESERVICE: panel de indicaciones paso a paso -->
@@ -1863,7 +1866,16 @@
     // 3. MAPA Y CAPAS
     // -------------------------------------------------------------
     const map = L.map('mapid').setView([-17.78, -63.18], 12);
-
+// Detectar si el usuario interactúa con el mapa para dejar de seguirlo
+window.siguiendoUsuario = true; 
+map.on('dragstart', function() {
+    window.siguiendoUsuario = false;
+});
+map.on('zoomstart', function(e) {
+    if (e.originalEvent) { 
+        window.siguiendoUsuario = false;
+    }
+});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
@@ -2633,7 +2645,11 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
             ruta.summary.totalTime = Math.round(ruta.summary.totalDistance / 1.2);
         }
         tipoRutaActual = ruta.tipo || 'senderos';
-        dibujarRuta(ruta.coordinates, true);
+        dibujarRuta(ruta.coordinates, false);
+// Si no es un recálculo, centramos en el origen con zoom cercano
+if (!esRecalculoAutomatico) {
+    map.setView([originLatLng.lat, originLatLng.lng], 18, { animate: true });
+}
 
         window.rutaCoordsActuales = ruta.coordinates;
         window.distanciaTotalRutaMetros = ruta.summary && ruta.summary.totalDistance;
@@ -2695,12 +2711,16 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
                     weight: 2
                 }).addTo(map);
             }
-            if (modoNavegacionActivo) {
-                if (window.originMarker) {
-                    window.originMarker.setLatLng([userLat, userLng]);
-                }
-                map.setView([userLat, userLng], 19, { animate: true });
-            }
+           if (modoNavegacionActivo) {
+    if (window.originMarker) {
+        window.originMarker.setLatLng([userLat, userLng]);
+    }
+    
+    // Solo centra el mapa si el usuario NO lo ha movido manualmente
+    if (window.siguiendoUsuario) {
+        map.setView([userLat, userLng], 18, { animate: true });
+    }
+}
 
             const distLineaRecta = distancia(userLat, userLng, destino.lat, destino.lng) * 1000;
             const precisionGPS = pos.coords.accuracy || 15;
@@ -2776,6 +2796,13 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
             panelInstrucciones.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
+document.getElementById('btnRecentrar').addEventListener('click', function() {
+    if (userLocation) {
+        window.siguiendoUsuario = true; 
+        map.setView([userLocation.lat, userLocation.lng], 18, { animate: true });
+        mostrarToastCerca('📍 Mapa centrado en tu ubicación.');
+    }
+});
 
     document.getElementById('btnMiUbicacion').addEventListener('click', function() {
         if (!navigator.geolocation) {
@@ -2799,8 +2826,10 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
                 userLocation = { lat, lng };
                 document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
                 document.getElementById('btnMiUbicacion').disabled = false;
-                map.setView([lat, lng], 15, { animate: true });
-                planificarRuta(userLocation, destino);
+               window.siguiendoUsuario = true;
+map.setView([lat, lng], 18, { animate: true });
+planificarRuta(userLocation, destino);
+document.getElementById('btnRecentrar').classList.remove('hidden');
             },
             function(err) {
                 let msg = 'No se pudo obtener ubicación. ';
