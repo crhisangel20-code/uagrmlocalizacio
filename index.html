@@ -2645,11 +2645,8 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
             ruta.summary.totalTime = Math.round(ruta.summary.totalDistance / 1.2);
         }
         tipoRutaActual = ruta.tipo || 'senderos';
-        dibujarRuta(ruta.coordinates, false);
-// Si no es un recálculo, centramos en el origen con zoom cercano
-if (!esRecalculoAutomatico) {
-    map.setView([originLatLng.lat, originLatLng.lng], 18, { animate: true });
-}
+         dibujarRuta(ruta.coordinates, false);
+// AÑADIDO: Ya no forzamos el zoom al origen para que puedas moverte libremente por el mapa
 
         window.rutaCoordsActuales = ruta.coordinates;
         window.distanciaTotalRutaMetros = ruta.summary && ruta.summary.totalDistance;
@@ -2826,9 +2823,8 @@ document.getElementById('btnRecentrar').addEventListener('click', function() {
                 userLocation = { lat, lng };
                 document.getElementById('btnMiUbicacion').innerHTML = '📍 Mi ubicación (GPS)';
                 document.getElementById('btnMiUbicacion').disabled = false;
-               window.siguiendoUsuario = true;
-map.setView([lat, lng], 18, { animate: true });
-planificarRuta(userLocation, destino);
+                window.siguiendoUsuario = false; // No forzamos el seguimiento al calcular la ruta
+                planificarRuta(userLocation, destino);
 document.getElementById('btnRecentrar').classList.remove('hidden');
             },
             function(err) {
