@@ -1254,6 +1254,8 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 <!-- Librería para leer PDFs -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<!-- Librería de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Librerías para el Mapa 3D y el Mapa de Calor -->
 <script src="https://cdn.osmbuildings.org/OSMBuildings-Leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
@@ -2054,7 +2056,10 @@ mapElement.addEventListener('touchcancel', function() {
     // ===============================================================
     // ESTADÍSTICAS: caché local de respaldo + API global de Supabase
     // ===============================================================
-    const ESTADISTICAS_API = 'https://uagrmlocalizacio-production.up.railway.app/api/visits';
+       // CONEXIÓN A SUPABASE
+    const SUPABASE_URL = 'https://aiihfjqabglzrbddqjtr.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_iegkaMAENqisowEcyiEgGg_B_pLq1VI';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let estadisticasGlobales = null;
 
     function obtenerVisitas() {
@@ -2064,9 +2069,7 @@ mapElement.addEventListener('touchcancel', function() {
     }
 
     function incrementarVisita(moduloId, moduloNombre) {
-        // Se conserva un respaldo local para que la interfaz no quede vacía
-        // si la API está temporalmente fuera de línea. No se presenta como
-        // estadística global.
+        // Guardado local (respaldo)
         const visitas = obtenerVisitas();
         if (!visitas[moduloId]) {
             visitas[moduloId] = { nombre: moduloNombre, count: 0 };
@@ -2075,19 +2078,18 @@ mapElement.addEventListener('touchcancel', function() {
         visitas[moduloId].nombre = moduloNombre;
         localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
 
-        fetch(ESTADISTICAS_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ moduloId: moduloId, moduloNombre: moduloNombre })
+        // Guardado en la nube (Supabase)
+        _supabase.rpc('incrementar_visita', { 
+            p_modulo_id: moduloId, 
+            p_modulo_nombre: moduloNombre 
         }).then(function(respuesta) {
-            if (respuesta.ok) {
-                estadisticasGlobales = null;
+            if (respuesta.error) {
+                console.warn('No se pudo registrar la visita global:', respuesta.error);
+            } else {
+                estadisticasGlobales = null; // Limpiamos caché para que traiga datos frescos
             }
-        }).catch(function(error) {
-            console.warn('No se pudo registrar la visita global:', error);
         });
     }
-
     function combinarRankingConEdificios(entradasGlobales) {
         const porId = {};
         (entradasGlobales || []).forEach(function(entry) {
@@ -2141,14 +2143,27 @@ mapElement.addEventListener('touchcancel', function() {
         document.getElementById('modalEstadisticasOverlay').classList.remove('hidden');
     }
 
-    async function cargarEstadisticasGlobales() {
-        const respuesta = await fetch(ESTADISTICAS_API, { headers: { 'Accept': 'application/json' } });
-        const datos = await respuesta.json();
-        if (!respuesta.ok || !datos.ok) {
-            throw new Error(datos.message || 'No se pudieron cargar las estadísticas globales.');
-        }
-        estadisticasGlobales = datos;
-        return datos;
+       async function cargarEstadisticasGlobales() {
+        const { data, error } = await _supabase.from('visitas').select('*');
+        if (error) throw new Error(error.message);
+        
+        // Formateamos los datos para que tu mapa los entienda
+        const entries = data.map(function(d) {
+            return {
+                modulo_id: d.modulo_id,
+                modulo_nombre: d.modulo_nombre,
+                visitas: d.contador
+            };
+        });
+        const totalVisits = entries.reduce(function(total, item) { return total + item.visitas; }, 0);
+        
+        estadisticasGlobales = { 
+            ok: true, 
+            entries: entries, 
+            totalVisits: totalVisits, 
+            fetchedAt: new Date().toISOString() 
+        };
+        return estadisticasGlobales;
     }
 
     async function mostrarEstadisticas() {
