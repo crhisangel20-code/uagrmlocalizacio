@@ -3272,12 +3272,11 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
                             return ed.nombre.includes(numModulo);
                         });
 
+                        // AÑADIDO: Solo mostramos los módulos si realmente existen en el mapa.
+                        // Si el PDF tiene códigos raros (como el 108-5 de la carrera), se ignoran.
                         if (edificio) {
                             htmlResultado += `<li>${edificio.nombre.replace('↪ ', '')} <small style="color: #666;">(${aulasTexto})</small> <button onclick="irAEdificio(${edificio.id})" style="margin-left: 10px; font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--verde-bandera); color: white; border: none; cursor: pointer;">Ir al mapa</button></li>`;
-                        } else {
-                            htmlResultado += `<li>Módulo ${numModulo} <small style="color: #666;">(${aulasTexto})</small> (No está registrado en el mapa aún)</li>`;
-                        }
-                    });
+                        }                    });
                     
                     htmlResultado += '</ul>';
                     resultadoDiv.innerHTML = htmlResultado;
