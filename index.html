@@ -1124,6 +1124,15 @@
             <!-- AÑADIDO: se quitó el cuadro de origen manual y "Calcular ruta" — ya no se usa Google Maps, solo GPS -->
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
+            <!-- BOTÓN PARA SUBIR HORARIO -->
+            <button class="btn-geo" id="btnSubirHorario" style="background: var(--oro-escudo); color: var(--verde-oscuro);">
+                📄 Subir mi Horario (PDF)
+            </button>
+            <!-- Input oculto que hace la magia de abrir los archivos -->
+            <input type="file" id="inputHorarioPDF" accept="application/pdf" hidden />
+            
+            <!-- Panel donde mostraremos el resultado -->
+            <div id="resultadoHorario" class="hidden" style="margin-top: 10px; padding: 10px; background: #fff; border: 1px solid var(--oro-escudo); border-radius: 8px; width: 100%;"></div>
         </div>
 
         <div class="leyenda" id="leyenda"></div>
@@ -1242,6 +1251,8 @@
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<!-- Librería para leer PDFs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
  <script>
   
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
@@ -3180,6 +3191,115 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
         });
 
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
+    // ===============================================================
+    // LECTOR DE HORARIOS PDF
+    // ===============================================================
+    // Configurar dónde está el "buscador de texto" de la librería PDF.js
+    if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    }
+
+    document.getElementById('btnSubirHorario').addEventListener('click', function() {
+        document.getElementById('inputHorarioPDF').click();
+    });
+
+    document.getElementById('inputHorarioPDF').addEventListener('change', function(e) {
+        const archivo = e.target.files[0];
+        if (!archivo) return;
+
+        const resultadoDiv = document.getElementById('resultadoHorario');
+        resultadoDiv.classList.remove('hidden');
+        resultadoDiv.innerHTML = '⏳ Leyendo tu horario... un momento.';
+
+        const lector = new FileReader();
+        lector.onload = function(evento) {
+            const arrayBuffer = evento.target.result;
+            
+            // Usamos la librería PDF.js para leer el archivo
+            window.pdfjsLib.getDocument(arrayBuffer).promise.then(function(pdf) {
+                let textoCompleto = '';
+                let promesasPaginas = [];
+
+                // Recorremos todas las páginas del PDF
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    promesasPaginas.push(
+                        pdf.getPage(i).then(function(pagina) {
+                            return pagina.getTextContent().then(function(contenido) {
+                                let textoPagina = '';
+                                contenido.items.forEach(function(item) {
+                                    textoPagina += item.str + ' ';
+                                });
+                                return textoPagina;
+                            });
+                        })
+                    );
+                }
+
+                // Cuando terminamos de leer todas las páginas:
+                Promise.all(promesasPaginas).then(function(paginas) {
+                    textoCompleto = paginas.join(' \n ');
+                    
+                    // AQUÍ ESTÁ LA MAGIA ACTUALIZADA PARA EL PDF REAL DE LA UAGRM
+                    // Busca patrones como "256-14", "201-03", etc.
+                    const regexModulo = /\b(\d{3})-(\d{1,3})\b/g;
+                    let coincidencia;
+                    let modulosEncontrados = new Map(); // Usamos Map para guardar el módulo y el aula
+
+                    while ((coincidencia = regexModulo.exec(textoCompleto)) !== null) {
+                        const numModulo = coincidencia[1]; // Captura el "256"
+                        const numAula = coincidencia[2];   // Captura el "14"
+                        
+                        if (!modulosEncontrados.has(numModulo)) {
+                            modulosEncontrados.set(numModulo, new Set());
+                        }
+                        modulosEncontrados.get(numModulo).add(numAula); // Guardamos las aulas (14, 19, 04...)
+                    }
+
+                    if (modulosEncontrados.size === 0) {
+                        resultadoDiv.innerHTML = '⚠️ No pudimos encontrar módulos en este PDF. Asegúrate de que sea el horario oficial.';
+                        return;
+                    }
+
+                                       // Ahora cruzamos los números del PDF con nuestra base de datos de edificios
+                    let htmlResultado = '<strong>📚 Tus clases detectadas:</strong><ul style="margin-top: 5px; padding-left: 20px;">';
+                    
+                    modulosEncontrados.forEach(function(aulasSet, numModulo) {
+                        // Convertimos las aulas a texto (ej: "Aula 14, Aula 19")
+                        const aulasTexto = Array.from(aulasSet).map(function(a) { return 'Aula ' + a; }).join(', ');
+
+                        // Buscamos en el array de edificios si existe ese número (ej. "256")
+                        const edificio = edificios.find(function(ed) {
+                            return ed.nombre.includes(numModulo);
+                        });
+
+                        if (edificio) {
+                            htmlResultado += `<li>${edificio.nombre.replace('↪ ', '')} <small style="color: #666;">(${aulasTexto})</small> <button onclick="irAEdificio(${edificio.id})" style="margin-left: 10px; font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--verde-bandera); color: white; border: none; cursor: pointer;">Ir al mapa</button></li>`;
+                        } else {
+                            htmlResultado += `<li>Módulo ${numModulo} <small style="color: #666;">(${aulasTexto})</small> (No está registrado en el mapa aún)</li>`;
+                        }
+                    });
+                    
+                    htmlResultado += '</ul>';
+                    resultadoDiv.innerHTML = htmlResultado;
+                });
+            }).catch(function(error) {
+                console.error("Error al leer el PDF:", error);
+                resultadoDiv.innerHTML = '❌ Error al leer el PDF. Asegúrate de que no esté protegido con contraseña.';
+            });
+        };
+        lector.readAsArrayBuffer(archivo);
+        e.target.value = ''; // Limpiar el input
+    });
+
+    // Función auxiliar que hace que el botón "Ir al mapa" funcione
+    window.irAEdificio = function(idEdificio) {
+        const selectElement = document.getElementById('targetid');
+        selectElement.value = String(idEdificio);
+        // Disparamos el evento change para que el mapa vuele hacia ese edificio
+        selectElement.dispatchEvent(new Event('change'));
+        // Hacemos scroll hacia el mapa
+        document.getElementById('mapid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
 </script>
 
 </body>
