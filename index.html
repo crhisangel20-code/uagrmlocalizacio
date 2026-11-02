@@ -2156,7 +2156,7 @@ if (userLocation) {
     }
 
        async function cargarEstadisticasGlobales() {
-        const { data, error } = await _supabase.from('visitas').select('*');
+        const { data, error } = await _supabase.rpc('ranking_visitas');
         if (error) throw new Error(error.message);
         
         // Formateamos los datos para que tu mapa los entienda
@@ -2164,7 +2164,7 @@ if (userLocation) {
             return {
                 modulo_id: d.modulo_id,
                 modulo_nombre: d.modulo_nombre,
-                visitas: d.contador
+                visitas: Number(d.visitas)
             };
         });
         const totalVisits = entries.reduce(function(total, item) { return total + item.visitas; }, 0);
