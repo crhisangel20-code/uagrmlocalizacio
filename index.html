@@ -1124,6 +1124,7 @@
             <!-- AÑADIDO: se quitó el cuadro de origen manual y "Calcular ruta" — ya no se usa Google Maps, solo GPS -->
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
+<button class="btn-estadisticas" id="btnMapaCalor" style="background: #E8622C;">🔥 Mapa de Calor</button>
             <!-- BOTÓN PARA SUBIR HORARIO -->
             <button class="btn-geo" id="btnSubirHorario" style="background: var(--oro-escudo); color: var(--verde-oscuro);">
                 📄 Subir mi Horario (PDF)
@@ -1253,6 +1254,9 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 <!-- Librería para leer PDFs -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<!-- Librerías para el Mapa 3D y el Mapa de Calor -->
+<script src="https://cdn.osmbuildings.org/OSMBuildings-Leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
  <script>
   
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
@@ -1887,10 +1891,28 @@ map.on('zoomstart', function(e) {
         window.siguiendoUsuario = false;
     }
 });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // 1. Definimos el mapa base (Calles)
+    const capaCalles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    });
 
+    // 2. Definimos el mapa satelital (Esri World Imagery - Gratuito y de alta calidad)
+    const capaSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+        // 3.Añadimos la capa de calles al mapa que ya creamos arriba
+    map.addLayer(capaCalles);
+
+    // MAGIA 3D: Levantar los edificios
+    const osmb = new OSMBuildings(map).load();
+
+    // 4. Agregamos el botón para cambiar entre Calles y Satélite
+    const capasBase = {
+        "🗺️ Calles": capaCalles,
+        "🛰️ Satélite": capaSatelite
+    };
+    L.control.layers(capasBase).addTo(map);
     // Marcadores
     const markers = {};
     edificios.forEach(ed => {
@@ -3299,6 +3321,35 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
         // Hacemos scroll hacia el mapa
         document.getElementById('mapid').scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
+
+    // MAGIA DE CALOR: Zonas concurridas
+    let capaCalor = null;
+    document.getElementById('btnMapaCalor').addEventListener('click', function() {
+        if (capaCalor) {
+            map.removeLayer(capaCalor);
+            capaCalor = null;
+            mostrarToastCerca('❄️ Mapa de calor desactivado');
+            return;
+        }
+
+        // Datos simulados de dónde se concentran más alumnos
+        const puntosCalor = [
+            [-17.7763402, -63.1950599, 1.0], // Informática
+            [-17.7764309, -63.1962735, 0.9], // Cs. Económicas
+            [-17.7756035, -63.1986441, 0.8], // Comedor
+            [-17.7780583, -63.1965498, 0.7], // Veterinarias
+            [-17.7747168, -63.1936147, 0.5]  // Módulo 201
+        ];
+
+        capaCalor = L.heatLayer(puntosCalor, {
+            radius: 40,
+            blur: 25,
+            maxZoom: 17,
+            gradient: {0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}
+        }).addTo(map);
+
+        mostrarToastCerca('🔥 Mostrando zonas de mayor tráfico estudiantil');
+    });
 </script>
 
 </body>
