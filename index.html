@@ -2083,7 +2083,7 @@ if (userLocation) {
         zonaOrigen = "Campus Universitario";
     } else if (distanciaCampus <= 15) {
         zonaOrigen = "Ciudad de Santa Cruz (Anillos)";
-    } else if (distanciaCampus <= 40) {
+    } else if (distanciaCampus <= 60) {
         zonaOrigen = "Área metropolitana (Warnes, Cotoca, Montero)";
     } else {
         zonaOrigen = "Provincia / Fuera de la ciudad";
@@ -2961,7 +2961,7 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
                 verificarEntradaCampus(lat, lng);
             },
             function() { /* silencioso: sin permiso o sin señal, no se interrumpe la app */ },
-            { enableHighAccuracy: false, maximumAge: 20000, timeout: 20000 }
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
         );
     }
 
