@@ -1965,11 +1965,7 @@ map.on('zoomstart', function(e) {
         selectedBuildingId = id;
         const edificioSeleccionado = edificios.find(e => e.id === id); // AÑADIDO PARA GA4 (referencia usada abajo)
 
-        // AÑADIDO PARA ESTADÍSTICAS: incrementar el contador de visitas del módulo seleccionado
-        if (edificioSeleccionado) {
-            incrementarVisita(id, edificioSeleccionado.nombre);
-        }
-
+        
         // AÑADIDO PARA GA4: evento al seleccionar un edificio en el <select>
         enviarEventoGA4('seleccion_edificio', { // AÑADIDO PARA GA4
             event_category: 'Mapa UAGRM',
@@ -2079,20 +2075,20 @@ mapElement.addEventListener('touchcancel', function() {
         localStorage.setItem('uagrm_visitas_modulos', JSON.stringify(visitas));
 
         // LÓGICA DE GEOANÁLISIS: Calcular de dónde viene
-        let zonaOrigen = "Desconocido";
-        if (userLocation) {
-            // Distancia aproximada desde la Plaza principal o el centro del campus
-            const distanciaCampus = distancia(userLocation.lat, userLocation.lng, -17.775488, -63.19373);
-            
-            if (distanciaCampus < 1) {
-                zonaOrigen = "Campus Universitario";
-            } else if (distanciaCampus <= 20) {
-                zonaOrigen = "Ciudad de Santa Cruz (Anillos)";
-            } else {
-                zonaOrigen = "Provincia / Fuera de la ciudad";
-            }
-        }
+       let zonaOrigen = "Sin ubicación GPS";
+if (userLocation) {
+    const distanciaCampus = distancia(userLocation.lat, userLocation.lng, -17.775488, -63.19373);
 
+    if (distanciaCampus < 1) {
+        zonaOrigen = "Campus Universitario";
+    } else if (distanciaCampus <= 15) {
+        zonaOrigen = "Ciudad de Santa Cruz (Anillos)";
+    } else if (distanciaCampus <= 40) {
+        zonaOrigen = "Área metropolitana (Warnes, Cotoca, Montero)";
+    } else {
+        zonaOrigen = "Provincia / Fuera de la ciudad";
+    }
+}
         // Guardado en la nube (Supabase)
         _supabase.rpc('incrementar_visita', { 
             p_modulo_id: moduloId, 
@@ -2100,7 +2096,7 @@ mapElement.addEventListener('touchcancel', function() {
             p_origen_zona: zonaOrigen
         }).then(function(respuesta) {
             if (respuesta.error) {
-                console.warn('No se pudo registrar la visita global:', respuesta.error);
+        console.error('Error al registrar visita:', respuesta.error.message, respuesta.error.details, respuesta.error.hint);
             } else {
                 estadisticasGlobales = null;
             }
@@ -2625,9 +2621,16 @@ function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         return;
     }
     destinoActual = destino;
-    const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
-    const opts = opciones || {};
-    const esRecalculoAutomatico = !!opts.recalculoAutomatico;
+const dist = distancia(originLatLng.lat, originLatLng.lng, destino.lat, destino.lng);
+const opts = opciones || {};
+const esRecalculoAutomatico = !!opts.recalculoAutomatico;
+
+// Registrar la visita UNA vez, ya con la ubicación del estudiante.
+// Los recálculos automáticos por desvío NO cuentan como visita nueva.
+if (!esRecalculoAutomatico) {
+    userLocation = { lat: originLatLng.lat, lng: originLatLng.lng };
+    incrementarVisita(destino.id, destino.nombre);
+}
     const navegacionEstabaActivaAntes = modoNavegacionActivo;
     const distanciaDirectaMetros = dist * 1000;
     // AÑADIDO: Si el usuario está lejos del campus (ej. Warnes), no calculamos la ruta interna
