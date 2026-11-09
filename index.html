@@ -806,6 +806,90 @@
             50% { transform: scale(1.35); }
         }
 
+/* ===== Guía tipo videojuego ===== */
+.guia-flecha-rot { width: 56px; height: 56px; transition: transform 0.25s ease-out; }
+.guia-flecha-bounce {
+    width: 100%; height: 100%;
+    animation: guiaRebote 0.7s ease-in-out infinite alternate;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45));
+}
+@keyframes guiaRebote {
+    from { transform: translateY(-16px); }
+    to   { transform: translateY(-30px); }
+}
+.guia-orbe {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff 0%, #E9D5FF 30%, #A855F7 75%);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 3px rgba(168,85,247,0.35), 0 0 18px 6px rgba(168,85,247,0.85);
+}
+.guia-flecha-rot.cerca path { fill: #22C55E; }
+.guia-orbe.cerca {
+    background: radial-gradient(circle at 35% 35%, #fff 0%, #BBF7D0 30%, #22C55E 75%);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.35), 0 0 18px 6px rgba(34,197,94,0.85);
+}
+.guia-onda-wrap { width: 140px; height: 140px; position: relative; pointer-events: none; }
+.guia-onda {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 3px solid #A855F7;
+    background: radial-gradient(circle, rgba(168,85,247,0.25) 0%, transparent 70%);
+    animation: guiaOnda 1s ease-out both;
+}
+.guia-onda.d2 { animation-delay: 0.2s; }
+.guia-onda-wrap.cerca .guia-onda {
+    border-color: #22C55E;
+    background: radial-gradient(circle, rgba(34,197,94,0.25) 0%, transparent 70%);
+}
+@keyframes guiaOnda {
+    0%   { transform: scale(0.1); opacity: 0.95; }
+    100% { transform: scale(1);   opacity: 0; }
+}
+
+/* ===== Eventos ===== */
+.ev-hidden { display: none !important; }
+.modal-ancho { max-width: 620px; }
+.btn-admin-flotante {
+    position: fixed; left: 14px; bottom: 14px; z-index: 9998;
+    background: var(--verde-oscuro); color: #fff; border: none;
+    padding: 12px 18px; border-radius: 30px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.3); font-family: var(--font-body);
+}
+.badge-evento {
+    width: 22px; height: 22px; border-radius: 50%; background: #B23A48; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.ev-card { background: var(--bg-panel); border-radius: 14px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--border-soft); }
+.ev-card img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.ev-card-body { padding: 12px 14px; }
+.ev-card h4 { font-family: var(--font-display); color: var(--text-heading); font-size: 1.05rem; margin-bottom: 4px; }
+.ev-meta { font-size: .78rem; color: var(--tierra); line-height: 1.5; }
+.ev-desc { font-size: .86rem; margin: 6px 0; color: var(--text-main); }
+.ev-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ev-btn {
+    border: none; background: var(--verde-bandera); color: #fff; padding: 10px 16px;
+    border-radius: 10px; font-weight: 600; font-size: .85rem; cursor: pointer; font-family: var(--font-body);
+}
+.ev-btn:hover { background: var(--verde-oscuro); }
+.ev-btn:disabled { opacity: .6; cursor: progress; }
+.ev-btn.ev-sec { background: var(--tierra); margin-top: 10px; }
+.ev-btn.ev-gm { background: var(--cielo); }
+.ev-btn.ev-del { background: var(--rojo-salud); }
+.ev-input {
+    width: 100%; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px;
+    border: 1.5px solid var(--border-soft); background: var(--bg-card); color: var(--text-main);
+    font-family: var(--font-body); font-size: .9rem;
+}
+.ev-label { display: block; font-size: .78rem; color: var(--tierra); font-weight: 600; }
+.ev-preview { width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 10px; }
+.ev-msg { font-size: .82rem; margin-top: 8px; color: var(--tierra); }
+.ev-sub { font-family: var(--font-display); color: var(--text-heading); margin: 16px 0 8px; }
+.ev-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; color: #fff; }
+.ev-estado.activo { background: #22C55E; } .ev-estado.programado { background: #3E7CB1; } .ev-estado.vencido { background: #888; }
+.ev-fila { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.ev-fila .ev-input { margin: 0; flex: 1; min-width: 170px; }
+#resultadoHorario.hidden { display: none; }
+
         .footer-note {
             margin-top: 16px;
             font-size: 0.82rem;
@@ -1125,6 +1209,7 @@
             <button class="btn-geo" id="btnMiUbicacion">📍 Mi ubicación (GPS)</button>
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
 <button class="btn-estadisticas" id="btnMapaCalor" style="background: #E8622C;">🔥 Mapa de Calor</button>
+<button class="btn-estadisticas" id="btnEventos" style="background:#B23A48;">🎉 Eventos</button>
             <!-- BOTÓN PARA SUBIR HORARIO -->
             <button class="btn-geo" id="btnSubirHorario" style="background: var(--oro-escudo); color: var(--verde-oscuro);">
                 📄 Subir mi Horario (PDF)
@@ -1246,6 +1331,52 @@
         </div>
         <div class="ranking-lista" id="rankingLista"></div>
         <button class="btn-cerrar-estadisticas" id="btnCerrarEstadisticas">Cerrar</button>
+    </div>
+</div>
+<!-- Eventos: vista pública -->
+<div class="modal-estadisticas-overlay hidden" id="modalEventosOverlay">
+    <div class="modal-estadisticas modal-ancho">
+        <h2>🎉 Eventos universitarios</h2>
+        <p class="modal-sub">Eventos vigentes en los módulos de la UAGRM</p>
+        <div id="listaEventosPublicos"></div>
+        <button class="btn-cerrar-estadisticas" id="btnCerrarEventos">Cerrar</button>
+    </div>
+</div>
+
+<!-- Eventos: panel de administración (solo con ?admin=true) -->
+<button class="btn-admin-flotante ev-hidden" id="btnAdminEventos">🛠️ Panel de eventos</button>
+<div class="modal-estadisticas-overlay hidden" id="modalAdminOverlay">
+    <div class="modal-estadisticas modal-ancho">
+        <h2>🛠️ Panel de eventos</h2>
+
+        <div id="adminLogin">
+            <p class="modal-sub">Inicia sesión para administrar eventos</p>
+            <input class="ev-input" type="email" id="adminEmail" placeholder="Correo" autocomplete="username">
+            <input class="ev-input" type="password" id="adminPass" placeholder="Contraseña" autocomplete="current-password">
+            <button class="ev-btn" id="btnAdminLogin">Entrar</button>
+            <p class="ev-msg" id="adminLoginMsg"></p>
+        </div>
+
+        <div id="adminPanel" class="ev-hidden">
+            <div class="ev-form">
+                <input class="ev-input" id="evTitulo" maxlength="120" placeholder="Nombre del evento">
+                <textarea class="ev-input" id="evDescripcion" rows="2" placeholder="Descripción (opcional)"></textarea>
+                <select class="ev-input" id="evModulo"></select>
+                <label class="ev-label">Inicio <input class="ev-input" type="datetime-local" id="evInicio"></label>
+                <label class="ev-label">Publicado hasta <input class="ev-input" type="datetime-local" id="evFin"></label>
+                <label class="ev-label">Imagen (una por evento)
+                    <input class="ev-input" type="file" id="evImagen" accept="image/*">
+                </label>
+                <img id="evPreview" class="ev-preview ev-hidden" alt="Vista previa">
+                <button class="ev-btn" id="btnGuardarEvento">💾 Publicar evento</button>
+                <p class="ev-msg" id="adminMsg"></p>
+            </div>
+            <h3 class="ev-sub">Todos los eventos</h3>
+            <div id="listaEventosAdmin"></div>
+            <button class="ev-btn ev-sec" id="btnAdminLogout">Cerrar sesión</button>
+        </div>
+
+        <button class="btn-cerrar-estadisticas" id="btnCerrarAdmin">Cerrar</button>
     </div>
 </div>
 
@@ -1536,7 +1667,7 @@
 
     // El sendero se conserva hasta un nodo que realmente permita acercarse
     // al módulo. La unión final siempre se agrega a las coordenadas, por lo
-    // que la línea lila nunca termina antes del marcador rojo.
+    // que la flecha nunca termina antes del marcador rojo.
     const MAXIMO_ACCESO_FINAL_METROS = 50;
 
     function distanciaTotalCoordenadas(coordenadas) {
@@ -1678,7 +1809,7 @@
                 return;
             }
 
-            // La línea lila sigue la red de senderos hasta el mejor punto de
+            // la flecha sigue la red de senderos hasta el mejor punto de
             // acceso y siempre conserva el tramo final hacia el destino.
             const coordenadasRuta = [L.latLng(origen.lat, origen.lng)];
             resultado.camino.forEach(function(id) {
@@ -1907,8 +2038,7 @@ map.on('zoomstart', function(e) {
     map.addLayer(capaCalles);
 
     // MAGIA 3D: Levantar los edificios
-    const osmb = new OSMBuildings(map).load();
-
+try { new OSMBuildings(map).load(); } catch (e) { console.warn('Mapa 3D no disponible:', e); }
     // 4. Agregamos el botón para cambiar entre Calles y Satélite
     const capasBase = {
         "🗺️ Calles": capaCalles,
@@ -2145,7 +2275,7 @@ if (userLocation) {
             item.innerHTML =
                 '<div class="ranking-posicion ' + clasePos + '">' + posicion + '</div>' +
                 '<div class="ranking-info">' +
-                    '<div class="ranking-nombre">' + entry.nombre + '</div>' +
+                   '<div class="ranking-nombre">' + esc(entry.nombre) + '</div>' +
                     '<div class="ranking-barra-bg"><div class="ranking-barra-fill" style="width:' + porcentaje + '%"></div></div>' +
                 '</div>' +
                 '<div class="ranking-visitas">' + entry.count + ' ' + (entry.count === 1 ? 'visita' : 'visitas') + '</div>';
@@ -2508,13 +2638,6 @@ if (userLocation) {
         toastCercaTimeoutId = setTimeout(() => toast.classList.remove('visible'), 5000);
     }
 
-    function limpiarCapaRuta() {
-        if (window.capaRutaPeatonal) {
-            map.removeLayer(window.capaRutaPeatonal);
-            window.capaRutaPeatonal = null;
-        }
-    }
-
     function dividirRutaPorTramoFinal(coords, distanciaRojaMetros) {
         if (!coords || coords.length < 2) {
             return { lila: [], roja: coords || [] };
@@ -2560,41 +2683,187 @@ if (userLocation) {
         return { lila: coords.slice(0, -1), roja: coords.slice(-2) };
     }
 
-   function dibujarRuta(coords, ajustarVista) {
+  // ===============================================================
+// GUÍA TIPO VIDEOJUEGO: flecha + orbe ping-pong + verde + onda
+// ===============================================================
+const GUIA = { coords: null, acum: [], total: 0, orbe: null, estela: [], flecha: null, raf: null, inicio: 0, cerca: null, cicloPrev: 0 };
+const N_ESTELA = 6;                // puntos de la estela del orbe
+const DISTANCIA_MIRA_METROS = 20;  // hacia qué punto adelante apunta la flecha
+const DISTANCIA_CERCA_METROS = 100; // a partir de aquí la guía se vuelve verde
+
+function iconoFlechaGuia() {
+    return L.divIcon({
+        className: '',
+        html: '<div class="guia-flecha-rot"><div class="guia-flecha-bounce">' +
+              '<svg viewBox="0 0 64 64" width="56" height="56">' +
+              '<path d="M32 4 L58 44 L32 34 L6 44 Z" fill="#A855F7" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>' +
+              '</svg></div></div>',
+        iconSize: [56, 56],
+        iconAnchor: [28, 28]
+    });
+}
+
+function iconoOrbeGuia() {
+    return L.divIcon({ className: '', html: '<div class="guia-orbe"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+}
+
+function construirAcumuladas(coords) {
+    const acum = [0];
+    for (let i = 1; i < coords.length; i++) {
+        acum.push(acum[i - 1] + distancia(coords[i - 1].lat, coords[i - 1].lng, coords[i].lat, coords[i].lng) * 1000);
+    }
+    return acum;
+}
+
+// Punto de la ruta a "d" metros desde el origen
+function puntoEnRuta(d) {
+    const coords = GUIA.coords, acum = GUIA.acum, total = GUIA.total;
+    d = Math.max(0, Math.min(total, d));
+    let i = 1;
+    while (i < acum.length - 1 && acum[i] < d) i++;
+    const a = coords[i - 1], b = coords[i];
+    const seg = acum[i] - acum[i - 1];
+    const f = seg ? (d - acum[i - 1]) / seg : 0;
+    return L.latLng(a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f);
+}
+
+// Onda expansiva en un punto (se borra sola)
+function lanzarOnda(latlng, cerca) {
+    const onda = L.marker(latlng, {
+        icon: L.divIcon({
+            className: '',
+            html: '<div class="guia-onda-wrap' + (cerca ? ' cerca' : '') + '">' +
+                  '<div class="guia-onda"></div><div class="guia-onda d2"></div></div>',
+            iconSize: [140, 140],
+            iconAnchor: [70, 70]
+        }),
+        interactive: false, keyboard: false, zIndexOffset: 800
+    }).addTo(map);
+    setTimeout(function() { map.removeLayer(onda); }, 1300);
+}
+
+// Cambia colores lila <-> verde
+function aplicarEstadoCerca(cerca) {
+    if (GUIA.flecha && GUIA.flecha.getElement()) {
+        const rot = GUIA.flecha.getElement().querySelector('.guia-flecha-rot');
+        if (rot) rot.classList.toggle('cerca', cerca);
+    }
+    if (GUIA.orbe && GUIA.orbe.getElement()) {
+        const orbe = GUIA.orbe.getElement().querySelector('.guia-orbe');
+        if (orbe) orbe.classList.toggle('cerca', cerca);
+    }
+    GUIA.estela.forEach(function(p) {
+        p.setStyle({ fillColor: cerca ? '#22C55E' : '#A855F7' });
+    });
+}
+
+// Animación ping-pong: origen -> destino -> origen ...
+function animarGuia(ts) {
+    if (!GUIA.coords) return;
+    const duracion = Math.max(1800, Math.min(5000, GUIA.total / 30 * 1000));
+    const ciclo = ((ts - GUIA.inicio) / duracion) % 2;
+        if (GUIA.cicloPrev !== null && GUIA.cicloPrev < 1 && ciclo >= 1) {
+        lanzarOnda(GUIA.coords[GUIA.coords.length - 1], GUIA.cerca === true);
+    }
+    GUIA.cicloPrev = ciclo;
+    const fase = ciclo <= 1 ? ciclo : 2 - ciclo;
+    const sentido = ciclo <= 1 ? 1 : -1;
+    const suave = 0.5 - 0.5 * Math.cos(Math.PI * fase);
+    const pos = suave * GUIA.total;
+
+    GUIA.orbe.setLatLng(puntoEnRuta(pos));
+    const paso = Math.max(2, GUIA.total * 0.025);
+    GUIA.estela.forEach(function(p, k) {
+        p.setLatLng(puntoEnRuta(pos - sentido * paso * (k + 1)));
+    });
+    GUIA.raf = requestAnimationFrame(animarGuia);
+}
+
+// Orienta la flecha hacia donde sigue la ruta y aplica el color "cerca"
+function actualizarFlechaGuia(lat, lng) {
+    if (!GUIA.coords || GUIA.coords.length < 2 || !GUIA.flecha) return;
+    const c = GUIA.coords;
+    let mejor = Infinity, idx = 0, proy = null;
+    for (let i = 0; i < c.length - 1; i++) {
+        const p = proyectarEnSegmento(lat, lng, c[i], c[i + 1]);
+        const d = distancia(lat, lng, p.lat, p.lng);
+        if (d < mejor) { mejor = d; idx = i; proy = p; }
+    }
+    let desde = proy, restante = DISTANCIA_MIRA_METROS;
+    let objetivo = c[idx + 1];
+    for (let k = idx + 1; k < c.length; k++) {
+        const d = distancia(desde.lat, desde.lng, c[k].lat, c[k].lng) * 1000;
+        if (d >= restante) {
+            const f = d ? restante / d : 0;
+            objetivo = { lat: desde.lat + (c[k].lat - desde.lat) * f, lng: desde.lng + (c[k].lng - desde.lng) * f };
+            break;
+        }
+        restante -= d;
+        desde = c[k];
+        objetivo = c[k];
+    }
+    const rumbo = calcularRumbo(lat, lng, objetivo.lat, objetivo.lng);
+    GUIA.flecha.setLatLng([lat, lng]);
+
+    const cerca = !!destinoActual &&
+        distancia(lat, lng, destinoActual.lat, destinoActual.lng) * 1000 <= DISTANCIA_CERCA_METROS;
+    if (cerca !== GUIA.cerca) {
+        GUIA.cerca = cerca;
+        aplicarEstadoCerca(cerca);
+    }
+
+    const el = GUIA.flecha.getElement();
+    if (el) {
+        const rot = el.querySelector('.guia-flecha-rot');
+        if (rot) rot.style.transform = 'rotate(' + rumbo + 'deg)';
+    }
+}
+
+function limpiarCapaRuta() {
+    if (GUIA.raf) cancelAnimationFrame(GUIA.raf);
+    GUIA.raf = null;
+    [GUIA.orbe, GUIA.flecha].concat(GUIA.estela).forEach(function(l) { if (l) map.removeLayer(l); });
+    GUIA.orbe = null; GUIA.flecha = null; GUIA.estela = []; GUIA.coords = null;
+    GUIA.cerca = null;
+    GUIA.cicloPrev = 0;
+    if (window.capaRutaPeatonal) {
+        map.removeLayer(window.capaRutaPeatonal);
+        window.capaRutaPeatonal = null;
+    }
+}
+
+function dibujarRuta(coords, ajustarVista) {
     limpiarCapaRuta();
     if (!coords || coords.length < 2) return;
 
-    // Convertir coordenadas a formato [[lat, lng], ...]
-    const puntos = coords.map(p => [p.lat, p.lng]);
+    GUIA.coords = coords;
+    GUIA.acum = construirAcumuladas(coords);
+    GUIA.total = GUIA.acum[GUIA.acum.length - 1];
 
-    const capasRuta = [];
+    for (let k = 0; k < N_ESTELA; k++) {
+        GUIA.estela.push(L.circleMarker(coords[0], {
+            radius: 8 - k, color: '#fff', weight: 1,
+            fillColor: '#A855F7', fillOpacity: 0.75 - k * 0.11,
+            opacity: 0.8 - k * 0.12, interactive: false
+        }).addTo(map));
+    }
+    GUIA.orbe = L.marker(coords[0], { icon: iconoOrbeGuia(), interactive: false, keyboard: false, zIndexOffset: 900 }).addTo(map);
+    GUIA.flecha = L.marker(coords[0], { icon: iconoFlechaGuia(), interactive: false, keyboard: false, zIndexOffset: 1000 }).addTo(map);
 
-    // Borde blanco más grueso (ampliado de 10 a 14)
-    capasRuta.push(L.polyline(puntos, {
-        color: '#ffffff',
-        weight: 14,
-        opacity: 0.98,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
+    actualizarFlechaGuia(coords[0].lat, coords[0].lng);
+        const ahoraMs = performance.now();
+    if (!window._guiaT0 || ahoraMs - (window._guiaUlt || 0) > 12000) window._guiaT0 = ahoraMs;
+    window._guiaUlt = ahoraMs;
+    GUIA.inicio = window._guiaT0;
+    GUIA.cicloPrev = null;
+    GUIA.raf = requestAnimationFrame(animarGuia);
 
-    // Línea lila principal (sin rojo al final)
-    capasRuta.push(L.polyline(puntos, {
-        color: '#A855F7',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-    }));
-
-    if (capasRuta.length > 0) {
-        window.capaRutaPeatonal = L.featureGroup(capasRuta).addTo(map);
-        if (ajustarVista && coords.length > 1) {
-            map.fitBounds(window.capaRutaPeatonal.getBounds(), { padding: [50, 50], maxZoom: 19 });
-        }
+    if (ajustarVista) {
+        map.fitBounds(L.latLngBounds(coords.map(function(p) { return [p.lat, p.lng]; })), { padding: [50, 50], maxZoom: 19 });
     }
 }
-  
+
+      
 function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
@@ -2742,7 +3011,7 @@ if (!esRecalculoAutomatico) {
             modoNavegacionActivo = true;
             document.getElementById('infoPanel').classList.remove('solo-boton');
             btnIniciarRutaPie.classList.add('hidden');
-            statusMsg.innerHTML = '↩️ Ruta recalculada. Sigue la línea lila y las indicaciones de abajo.';
+            statusMsg.innerHTML = '↩️ Ruta recalculada. Sigue la flecha y las indicaciones de abajo.';
         } else {
             document.getElementById('infoPanel').classList.add('solo-boton');
             btnIniciarRutaPie.classList.remove('hidden');
@@ -2754,8 +3023,7 @@ if (!esRecalculoAutomatico) {
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
         document.getElementById('infoPanel').classList.remove('solo-boton');
-        limpiarCapaRuta();
-        return;
+                dibujarRuta([L.latLng(originLatLng.lat, originLatLng.lng), L.latLng(destino.lat, destino.lng)], false);
     } else {
         statusMsg.innerHTML = '🚶 Calculando ruta...';
         routerElegido.route(waypointsRuta, completarRuta, null);
@@ -2852,9 +3120,9 @@ if (!esRecalculoAutomatico) {
             }
 
             if (dMetros <= 100) {
-                statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m siguiendo la ruta). Sigue la línea lila para llegar a tu destino.';
+                statusMsg.innerHTML = '🔔 ¡Estás muy cerca! (menos de 100 m siguiendo la ruta). Sigue la flecha para llegar a tu destino.';
                 if (!window.alertaCercaMostrada) {
-                    mostrarToastCerca(`Estás a unos ${Math.round(dMetros)} m de tu destino. Sigue la línea lila en el mapa.`);
+                    mostrarToastCerca(`Estás a unos ${Math.round(dMetros)} m de tu destino. Sigue la flecha en el mapa.`);
                     window.alertaCercaMostrada = true;
                 }
             }
@@ -2872,7 +3140,7 @@ if (!esRecalculoAutomatico) {
     // la navegación.
     btnIniciarRutaPie.addEventListener('click', function() {
         modoNavegacionActivo = true;
-        statusMsg.innerHTML = '🚶 Navegación iniciada. Sigue la línea lila y las indicaciones de abajo.';
+        statusMsg.innerHTML = '🚶 Navegación iniciada. Sigue la flecha y las indicaciones de abajo.';
         this.classList.add('hidden');
         if (panelInstrucciones) {
             panelInstrucciones.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2958,6 +3226,7 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
                 const lng = pos.coords.longitude;
                 userLocation = { lat: lat, lng: lng };
                 actualizarEnlaceGoogleMaps(lat, lng);
+                actualizarFlechaGuia(lat, lng);
                 verificarEntradaCampus(lat, lng);
             },
             function() { /* silencioso: sin permiso o sin señal, no se interrumpe la app */ },
@@ -3245,6 +3514,280 @@ document.getElementById('btnRecentrar').classList.remove('hidden');
         .catch(function() {
             console.log('ℹ️ No se encontró senderos.json — se usará OpenRouteService para las rutas a pie.');
         });
+// ===============================================================
+// EVENTOS UNIVERSITARIOS (Supabase) + PANEL DE ADMINISTRACIÓN
+// ===============================================================
+const byId = function(id) { return document.getElementById(id); };
+let eventosVigentes = [];
+const capaEventos = L.layerGroup().addTo(map);
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+function nombreModulo(id) {
+    const e = edificios.find(function(x) { return x.id === Number(id); });
+    return e ? e.nombre.replace(/^↪\s*/, '') : 'Módulo ' + id;
+}
+function fmtFecha(iso) {
+    return new Date(iso).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' });
+}
+function aLocalInput(d) {
+    const p = function(n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function estadoEvento(ev) {
+    const n = Date.now();
+    if (new Date(ev.fecha_inicio) > n) return 'programado';
+    if (new Date(ev.fecha_fin) < n) return 'vencido';
+    return 'activo';
+}
+
+// Ruta de Google Maps desde tu GPS (si existe) hasta el módulo del evento
+function urlGoogleMapsEvento(ev) {
+    const m = edificios.find(function(e) { return e.id === Number(ev.modulo_id); });
+    if (!m) return null;
+    let u = 'https://www.google.com/maps/dir/?api=1&destination=' + m.lat + ',' + m.lng + '&travelmode=walking';
+    if (userLocation) u += '&origin=' + userLocation.lat + ',' + userLocation.lng;
+    return u;
+}
+
+// ---------- Vista pública ----------
+async function cargarEventos() {
+    const ahora = new Date().toISOString();
+    const r = await _supabase.from('eventos').select('*')
+        .lte('fecha_inicio', ahora).gte('fecha_fin', ahora)
+        .order('fecha_inicio', { ascending: true });
+    if (r.error) { console.warn('No se pudieron cargar eventos:', r.error.message); return; }
+    eventosVigentes = r.data || [];
+    pintarEventosEnMapa();
+}
+
+function pintarEventosEnMapa() {
+    capaEventos.clearLayers();
+    Object.keys(markers).forEach(function(id) {
+        const mk = markers[id];
+        if (!mk._popupBase) mk._popupBase = mk.getPopup().getContent();
+        mk.setPopupContent(mk._popupBase);
+    });
+    const porModulo = {};
+    eventosVigentes.forEach(function(ev) {
+        (porModulo[ev.modulo_id] = porModulo[ev.modulo_id] || []).push(ev);
+    });
+    Object.keys(porModulo).forEach(function(id) {
+        const mk = markers[id];
+        if (!mk) return;
+        mk.setPopupContent(mk._popupBase + '<hr style="margin:6px 0"><b>🎉 Eventos:</b><br>' +
+            porModulo[id].map(function(ev) { return '• ' + esc(ev.titulo); }).join('<br>') +
+            '<br><a href="#" data-ev-abrir="1">Ver detalles</a>');
+        L.marker(mk.getLatLng(), {
+            icon: L.divIcon({ className: '', html: '<div class="badge-evento">🎉</div>', iconSize: [22, 22], iconAnchor: [-4, 38] }),
+            interactive: false, zIndexOffset: 500
+        }).addTo(capaEventos);
+    });
+}
+
+function renderEventosPublicos() {
+    const cont = byId('listaEventosPublicos');
+    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
+    if (!lista.length) {
+        cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
+        return;
+    }
+    cont.innerHTML = lista.map(function(ev) {
+        return '<div class="ev-card">' +
+            (ev.imagen_url ? '<img src="' + esc(ev.imagen_url) + '" alt="' + esc(ev.titulo) + '" loading="lazy">' : '') +
+            '<div class="ev-card-body">' +
+                '<h4>' + esc(ev.titulo) + '</h4>' +
+                '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
+                (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
+                '<div class="ev-acciones">' +
+                    '<button class="ev-btn" data-ev-ir="' + ev.modulo_id + '">🧭 Ruta en el mapa</button>' +
+                    '<button class="ev-btn ev-gm" data-ev-gm="' + ev.id + '">🗺️ Google Maps</button>' +
+                '</div>' +
+            '</div></div>';
+    }).join('');
+}
+
+async function abrirEventos() {
+    byId('modalEventosOverlay').classList.remove('hidden');
+    renderEventosPublicos();
+    await cargarEventos();
+    renderEventosPublicos();
+}
+
+byId('btnEventos').addEventListener('click', abrirEventos);
+byId('btnCerrarEventos').addEventListener('click', function() { byId('modalEventosOverlay').classList.add('hidden'); });
+byId('modalEventosOverlay').addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+
+byId('listaEventosPublicos').addEventListener('click', function(e) {
+    const ir = e.target.closest('[data-ev-ir]');
+    const gm = e.target.closest('[data-ev-gm]');
+    if (ir) {
+        byId('modalEventosOverlay').classList.add('hidden');
+        window.irAEdificio(Number(ir.getAttribute('data-ev-ir')));
+        mostrarToastCerca('📍 Destino fijado. Pulsa "Mi ubicación (GPS)" para guiarte.');
+        enviarEventoGA4('evento_ruta_mapa', { event_category: 'Eventos', event_label: ir.getAttribute('data-ev-ir') });
+    } else if (gm) {
+        const ev = eventosVigentes.find(function(x) { return String(x.id) === gm.getAttribute('data-ev-gm'); });
+        const url = ev && urlGoogleMapsEvento(ev);
+        if (url) window.open(url, '_blank', 'noopener');
+        enviarEventoGA4('evento_ruta_google', { event_category: 'Eventos', event_label: ev ? ev.titulo : '' });
+    }
+});
+document.addEventListener('click', function(e) {
+    if (e.target.closest('[data-ev-abrir]')) { e.preventDefault(); abrirEventos(); }
+});
+
+// ---------- Panel de administración ----------
+function comprimirImagen(archivo) {
+    return createImageBitmap(archivo).then(function(bmp) {
+        const max = 1280;
+        const esc2 = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(bmp.width * esc2);
+        c.height = Math.round(bmp.height * esc2);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        return new Promise(function(ok) { c.toBlob(ok, 'image/jpeg', 0.82); });
+    });
+}
+
+function msgAdmin(t, error) {
+    const m = byId('adminMsg');
+    m.textContent = t;
+    m.style.color = error ? '#B23A48' : '';
+}
+
+async function mostrarPanelSegunSesion() {
+    const s = await _supabase.auth.getSession();
+    const logueado = !!(s.data && s.data.session);
+    byId('adminLogin').classList.toggle('ev-hidden', logueado);
+    byId('adminPanel').classList.toggle('ev-hidden', !logueado);
+    if (logueado) await cargarEventosAdmin();
+}
+
+async function cargarEventosAdmin() {
+    const r = await _supabase.from('eventos').select('*').order('fecha_fin', { ascending: false });
+    const cont = byId('listaEventosAdmin');
+    if (r.error) { cont.innerHTML = '<div class="ranking-vacio">Error: ' + esc(r.error.message) + '</div>'; return; }
+    if (!r.data.length) { cont.innerHTML = '<div class="ranking-vacio">Aún no hay eventos.</div>'; return; }
+    cont.innerHTML = r.data.map(function(ev) {
+        const est = estadoEvento(ev);
+        return '<div class="ev-card"><div class="ev-card-body">' +
+            '<h4>' + esc(ev.titulo) + ' <span class="ev-estado ' + est + '">' + est + '</span></h4>' +
+            '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 ' + esc(fmtFecha(ev.fecha_inicio)) + ' → ' + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
+            '<div class="ev-fila">' +
+                '<input class="ev-input" type="datetime-local" id="fin-' + ev.id + '" value="' + aLocalInput(new Date(ev.fecha_fin)) + '">' +
+                '<button class="ev-btn" data-adm-fecha="' + ev.id + '">Cambiar fecha fin</button>' +
+                '<button class="ev-btn ev-del" data-adm-del="' + ev.id + '" data-img="' + esc(ev.imagen_url || '') + '">Eliminar</button>' +
+            '</div></div></div>';
+    }).join('');
+}
+
+async function guardarEvento() {
+    const titulo = byId('evTitulo').value.trim();
+    const modulo = Number(byId('evModulo').value);
+    const ini = byId('evInicio').value, fin = byId('evFin').value;
+    const archivo = byId('evImagen').files[0];
+    if (titulo.length < 3) return msgAdmin('Escribe un nombre (mínimo 3 letras).', true);
+    if (!modulo) return msgAdmin('Elige el módulo del evento.', true);
+    if (!ini || !fin || new Date(fin) <= new Date(ini)) return msgAdmin('La fecha fin debe ser posterior al inicio.', true);
+
+    const btn = byId('btnGuardarEvento');
+    btn.disabled = true; msgAdmin('Guardando…');
+    try {
+        let imagenUrl = null;
+        if (archivo) {
+            const blob = await comprimirImagen(archivo);
+            const ruta = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+            const up = await _supabase.storage.from('eventos').upload(ruta, blob, { contentType: 'image/jpeg' });
+            if (up.error) throw up.error;
+            imagenUrl = _supabase.storage.from('eventos').getPublicUrl(ruta).data.publicUrl;
+        }
+        const ins = await _supabase.from('eventos').insert({
+            titulo: titulo,
+            descripcion: byId('evDescripcion').value.trim() || null,
+            modulo_id: modulo,
+            imagen_url: imagenUrl,
+            fecha_inicio: new Date(ini).toISOString(),
+            fecha_fin: new Date(fin).toISOString()
+        });
+        if (ins.error) throw ins.error;
+        msgAdmin('✅ Evento publicado.');
+        byId('evTitulo').value = ''; byId('evDescripcion').value = '';
+        byId('evImagen').value = ''; byId('evPreview').classList.add('ev-hidden');
+        await cargarEventosAdmin(); await cargarEventos();
+    } catch (err) {
+        msgAdmin('Error: ' + (err.message || err), true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function iniciarAdmin() {
+    if (new URLSearchParams(location.search).get('admin') !== 'true') return;
+    byId('btnAdminEventos').classList.remove('ev-hidden');
+
+    const sel = byId('evModulo');
+    sel.innerHTML = '<option value="">-- Módulo del evento --</option>';
+    [...edificios].sort(function(a, b) { return a.nombre.localeCompare(b.nombre); }).forEach(function(ed) {
+        const o = document.createElement('option');
+        o.value = ed.id; o.textContent = ed.nombre.replace(/^↪\s*/, '');
+        sel.appendChild(o);
+    });
+    const ahora = new Date();
+    byId('evInicio').value = aLocalInput(ahora);
+    byId('evFin').value = aLocalInput(new Date(ahora.getTime() + 7 * 86400000));
+
+    byId('btnAdminEventos').addEventListener('click', function() {
+        byId('modalAdminOverlay').classList.remove('hidden');
+        mostrarPanelSegunSesion();
+    });
+    byId('btnCerrarAdmin').addEventListener('click', function() { byId('modalAdminOverlay').classList.add('hidden'); });
+    byId('btnAdminLogin').addEventListener('click', async function() {
+        const r = await _supabase.auth.signInWithPassword({ email: byId('adminEmail').value.trim(), password: byId('adminPass').value });
+        byId('adminLoginMsg').textContent = r.error ? 'Credenciales incorrectas.' : '';
+        if (!r.error) { byId('adminPass').value = ''; mostrarPanelSegunSesion(); }
+    });
+    byId('btnAdminLogout').addEventListener('click', async function() {
+        await _supabase.auth.signOut(); mostrarPanelSegunSesion();
+    });
+    byId('btnGuardarEvento').addEventListener('click', guardarEvento);
+    byId('evImagen').addEventListener('change', function() {
+        const f = this.files[0], pv = byId('evPreview');
+        if (!f) { pv.classList.add('ev-hidden'); return; }
+        pv.src = URL.createObjectURL(f); pv.classList.remove('ev-hidden');
+    });
+    byId('listaEventosAdmin').addEventListener('click', async function(e) {
+        const fecha = e.target.closest('[data-adm-fecha]');
+        const del = e.target.closest('[data-adm-del]');
+        if (fecha) {
+            const id = fecha.getAttribute('data-adm-fecha');
+            const nuevo = byId('fin-' + id).value;
+            if (!nuevo) return;
+            const r = await _supabase.from('eventos').update({ fecha_fin: new Date(nuevo).toISOString() }).eq('id', id);
+            msgAdmin(r.error ? 'Error: ' + r.error.message : '✅ Fecha actualizada.', !!r.error);
+            await cargarEventosAdmin(); await cargarEventos();
+        } else if (del) {
+            if (!confirm('¿Eliminar este evento?')) return;
+            const img = del.getAttribute('data-img');
+            const r = await _supabase.from('eventos').delete().eq('id', del.getAttribute('data-adm-del'));
+            if (!r.error && img) {
+                const ruta = decodeURIComponent(img.split('/eventos/').pop());
+                await _supabase.storage.from('eventos').remove([ruta]);
+            }
+            msgAdmin(r.error ? 'Error: ' + r.error.message : '🗑️ Evento eliminado.', !!r.error);
+            await cargarEventosAdmin(); await cargarEventos();
+        }
+    });
+}
+
+// Arranque
+cargarEventos();
+setInterval(cargarEventos, 5 * 60 * 1000); // refresca y retira eventos vencidos
+iniciarAdmin();
+
 
     console.log('✅ Mapa inteligente UAGRM (identidad cruceña) cargado.');
     // ===============================================================
