@@ -1226,6 +1226,70 @@
     border: 3px solid #fff;
     box-shadow: 0 0 0 6px rgba(0,204,68,.35);
 }
+/* ===== Guía en 3D ===== */
+.oculto3d { display: none !important; }
+.panel-guia-3d {
+    position: absolute;
+    top: 66px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10003;
+    width: min(92vw, 440px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.fila-guia-3d { display: flex; gap: 8px; }
+.fila-guia-3d select {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 12px;
+    border-radius: 12px;
+    border: none;
+    font-family: var(--font-body);
+    font-size: .9rem;
+    background: #fff;
+    color: #1C2620;
+}
+.fila-guia-3d button {
+    border: none;
+    background: var(--oro-escudo);
+    color: var(--verde-oscuro);
+    font-weight: 700;
+    padding: 11px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: var(--font-body);
+}
+.banner-giro-3d {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(10,74,53,.95);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4);
+}
+.banner-giro-3d .icono-giro { font-size: 2rem; line-height: 1; }
+.banner-giro-3d .texto-giro { font-weight: 700; font-size: 1rem; }
+.banner-giro-3d small { display: block; font-weight: 500; opacity: .85; margin-top: 2px; }
+.btn-centrar-3d {
+    position: absolute;
+    right: 14px;
+    bottom: 70px;
+    z-index: 10003;
+    border: none;
+    background: var(--oro-escudo);
+    color: var(--verde-oscuro);
+    font-weight: 700;
+    padding: 12px 18px;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    font-family: var(--font-body);
+}
 </style>
 </head>
 <body>
@@ -1445,6 +1509,17 @@
     <button class="btn-cerrar-3d" id="btnCerrar3D">✖ Cerrar 3D</button>
     <div id="mapa3d"></div>
     <div class="aviso-3d">🖐️ Arrastra con 2 dedos hacia arriba/abajo para inclinar · gira con 2 dedos</div>
+    <div class="panel-guia-3d">
+        <div class="fila-guia-3d">
+            <select id="selectDestino3D"><option value="">-- Elige tu destino --</option></select>
+            <button id="btnGuiar3D">📍 Guiarme</button>
+        </div>
+        <div class="banner-giro-3d oculto3d" id="bannerGiro3D">
+            <span class="icono-giro" id="iconoGiro3D">⬆️</span>
+            <div class="texto-giro"><span id="textoGiro3D"></span><small id="textoDist3D"></small></div>
+        </div>
+    </div>
+    <button class="btn-centrar-3d oculto3d" id="btnCentrar3D">📍 Centrar</button>
 </div>
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4123,6 +4198,236 @@ iniciarAdmin();
 
     document.getElementById('btnCerrar3D').addEventListener('click', function() {
         document.getElementById('contenedor3D').classList.add('hidden');
+    });
+    // ===============================================================
+    // GUÍA EN 3D: flecha + pelotita + indicación de giro
+    // (usa la misma ruta y la misma pelotita que ya calcula el mapa 2D)
+    // ===============================================================
+    let flecha3D = null, orbe3D = null, destino3D = null;
+    let destinoIdMostrado3D = null, rutaVista3D = null;
+    let siguiendo3D = true, guiando3D = false, rumbo3DActual = 0;
+    let guiaCreada3D = false;
+
+    // Llenar la lista de destinos del 3D
+    (function() {
+        const sel3 = document.getElementById('selectDestino3D');
+        sorted.forEach(function(ed) {
+            const o = document.createElement('option');
+            o.value = ed.id;
+            o.textContent = ed.nombre.replace(/^↪\s*/, '');
+            sel3.appendChild(o);
+        });
+    })();
+
+    function crearGuia3D() {
+        if (guiaCreada3D || !mapa3D) return;
+        guiaCreada3D = true;
+
+        const elOrbe = document.createElement('div');
+        elOrbe.className = 'guia-orbe';
+        orbe3D = new maplibregl.Marker({ element: elOrbe })
+            .setLngLat([-63.1945, -17.7765]).addTo(mapa3D);
+
+        const elFlecha = document.createElement('div');
+        elFlecha.style.width = '56px';
+        elFlecha.style.height = '56px';
+        elFlecha.innerHTML =
+            '<div class="guia-flecha-rot"><div class="guia-flecha-bounce">' +
+            '<svg viewBox="0 0 64 64" width="56" height="56">' +
+            '<path d="M32 4 L58 44 L32 34 L6 44 Z" fill="#A855F7" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>' +
+            '</svg></div></div>';
+        flecha3D = new maplibregl.Marker({ element: elFlecha })
+            .setLngLat([-63.1945, -17.7765]).addTo(mapa3D);
+
+        mapa3D.on('rotate', aplicarRotacionFlecha3D);
+        ['dragstart', 'rotatestart', 'zoomstart', 'pitchstart'].forEach(function(nombre) {
+            mapa3D.on(nombre, function(e) {
+                if (e.originalEvent) {
+                    siguiendo3D = false;
+                    if (GUIA.coords) document.getElementById('btnCentrar3D').classList.remove('oculto3d');
+                }
+            });
+        });
+
+        // La pelotita del 3D copia en cada instante a la pelotita del 2D
+        (function animar() {
+            if (GUIA.orbe && orbe3D) {
+                const ll = GUIA.orbe.getLatLng();
+                orbe3D.setLngLat([ll.lng, ll.lat]);
+                orbe3D.getElement().style.display = '';
+            } else if (orbe3D) {
+                orbe3D.getElement().style.display = 'none';
+            }
+            requestAnimationFrame(animar);
+        })();
+    }
+
+    function aplicarRotacionFlecha3D() {
+        if (!flecha3D || !mapa3D) return;
+        const rot = flecha3D.getElement().querySelector('.guia-flecha-rot');
+        if (rot) rot.style.transform = 'rotate(' + (rumbo3DActual - mapa3D.getBearing()) + 'deg)';
+    }
+
+    // Calcula hacia dónde apuntar y cuál es el próximo giro
+    function calcularGuia3D(lat, lng) {
+        const c = GUIA.coords;
+        let mejor = Infinity, idx = 0, proy = null;
+        for (let i = 0; i < c.length - 1; i++) {
+            const p = proyectarEnSegmento(lat, lng, c[i], c[i + 1]);
+            const d = distancia(lat, lng, p.lat, p.lng);
+            if (d < mejor) { mejor = d; idx = i; proy = p; }
+        }
+
+        let desde = proy, resto = DISTANCIA_MIRA_METROS, objetivo = c[idx + 1];
+        for (let k = idx + 1; k < c.length; k++) {
+            const d = distancia(desde.lat, desde.lng, c[k].lat, c[k].lng) * 1000;
+            if (d >= resto) {
+                const f = d ? resto / d : 0;
+                objetivo = { lat: desde.lat + (c[k].lat - desde.lat) * f, lng: desde.lng + (c[k].lng - desde.lng) * f };
+                break;
+            }
+            resto -= d;
+            desde = c[k];
+            objetivo = c[k];
+        }
+        const rumbo = calcularRumbo(lat, lng, objetivo.lat, objetivo.lng);
+
+        let acumulado = distancia(proy.lat, proy.lng, c[idx + 1].lat, c[idx + 1].lng) * 1000;
+        let giro = null;
+        for (let k = idx + 1; k < c.length - 1; k++) {
+            const r1 = calcularRumbo(c[k - 1].lat, c[k - 1].lng, c[k].lat, c[k].lng);
+            const r2 = calcularRumbo(c[k].lat, c[k].lng, c[k + 1].lat, c[k + 1].lng);
+            const diff = ((r2 - r1 + 180) % 360 + 360) % 360 - 180;
+            if (Math.abs(diff) > 30) {
+                giro = {
+                    texto: diff > 0 ? 'Gira a la derecha' : 'Gira a la izquierda',
+                    icono: diff > 0 ? '↱' : '↰',
+                    metros: Math.round(acumulado)
+                };
+                break;
+            }
+            acumulado += distancia(c[k].lat, c[k].lng, c[k + 1].lat, c[k + 1].lng) * 1000;
+        }
+
+        const info = distanciaRestanteEnRuta(c, lat, lng);
+        return { rumbo: rumbo, giro: giro, restante: info ? Math.round(info.distanciaRestanteMetros) : null };
+    }
+
+    function mostrarBanner3D(icono, texto, detalle) {
+        document.getElementById('bannerGiro3D').classList.remove('oculto3d');
+        document.getElementById('iconoGiro3D').textContent = icono;
+        document.getElementById('textoGiro3D').textContent = texto;
+        document.getElementById('textoDist3D').textContent = detalle || '';
+    }
+
+    // Se ejecuta cada segundo mientras el 3D está abierto
+    function tick3D() {
+        const cont = document.getElementById('contenedor3D');
+        if (!mapa3D || cont.classList.contains('hidden') || !mapa3D.getSource('ruta3d')) return;
+        crearGuia3D();
+
+        const coords = GUIA.coords;
+
+        // Dibujar la ruta cuando cambia
+        if (coords !== rutaVista3D) {
+            rutaVista3D = coords;
+            mapa3D.getSource('ruta3d').setData(
+                coords && coords.length > 1
+                    ? { type: 'Feature', geometry: { type: 'LineString', coordinates: coords.map(function(p) { return [p.lng, p.lat]; }) } }
+                    : { type: 'FeatureCollection', features: [] }
+            );
+        }
+
+        // Marcador rojo del destino
+        if (destinoActual && destinoActual.id !== destinoIdMostrado3D) {
+            destinoIdMostrado3D = destinoActual.id;
+            if (destino3D) destino3D.remove();
+            const fuera = document.createElement('div');
+            fuera.innerHTML = '<div class="ruta-destino-marker"></div>';
+            destino3D = new maplibregl.Marker({ element: fuera })
+                .setLngLat([destinoActual.lng, destinoActual.lat]).addTo(mapa3D);
+        }
+
+        const elFlecha = flecha3D.getElement();
+
+        // Sin ruta
+        if (!coords || coords.length < 2) {
+            elFlecha.style.display = 'none';
+            document.getElementById('btnCentrar3D').classList.add('oculto3d');
+            if (guiando3D && userLocation && destinoActual &&
+                distancia(userLocation.lat, userLocation.lng, destinoActual.lat, destinoActual.lng) * 1000 <= 25) {
+                mostrarBanner3D('🎉', '¡Has llegado!', destinoActual.nombre.replace(/^↪\s*/, ''));
+                guiando3D = false;
+            } else if (!guiando3D) {
+                document.getElementById('bannerGiro3D').classList.add('oculto3d');
+            }
+            return;
+        }
+
+        // Con ruta pero sin GPS todavía
+        if (!userLocation) {
+            elFlecha.style.display = 'none';
+            mostrarBanner3D('📡', 'Buscando tu ubicación GPS…', 'Sal a un lugar abierto');
+            return;
+        }
+
+        elFlecha.style.display = '';
+        if (guiando3D && !modoNavegacionActivo) modoNavegacionActivo = true;
+
+        const g = calcularGuia3D(userLocation.lat, userLocation.lng);
+        rumbo3DActual = g.rumbo;
+        flecha3D.setLngLat([userLocation.lng, userLocation.lat]);
+        aplicarRotacionFlecha3D();
+
+        // Verde cuando estás cerca
+        const cerca = !!destinoActual &&
+            distancia(userLocation.lat, userLocation.lng, destinoActual.lat, destinoActual.lng) * 1000 <= DISTANCIA_CERCA_METROS;
+        elFlecha.querySelector('.guia-flecha-rot').classList.toggle('cerca', cerca);
+        orbe3D.getElement().classList.toggle('cerca', cerca);
+
+        // Cartel de indicación
+        const faltan = g.restante != null ? 'Faltan ' + g.restante + ' m al destino' : '';
+        if (g.giro && (g.restante == null || g.giro.metros < g.restante - 5)) {
+            mostrarBanner3D(g.giro.icono, g.giro.texto + ' en ' + g.giro.metros + ' m', faltan);
+        } else {
+            mostrarBanner3D('⬆️', 'Sigue recto', faltan);
+        }
+
+        // La cámara te sigue y gira hacia donde debes caminar
+        if (siguiendo3D) {
+            document.getElementById('btnCentrar3D').classList.add('oculto3d');
+            mapa3D.easeTo({
+                center: [userLocation.lng, userLocation.lat],
+                bearing: g.rumbo,
+                pitch: 65,
+                zoom: 19,
+                duration: 900
+            });
+        }
+    }
+    setInterval(tick3D, 1000);
+
+    // Botón "Guiarme"
+    document.getElementById('btnGuiar3D').addEventListener('click', function() {
+        const id = document.getElementById('selectDestino3D').value;
+        if (!id) { alert('Primero elige un edificio destino.'); return; }
+        select.value = id;
+        select.dispatchEvent(new Event('change'));
+        guiando3D = true;
+        siguiendo3D = true;
+        if (!userLocation) document.getElementById('btnMiUbicacion').click();
+    });
+
+    // Botón "Centrar"
+    document.getElementById('btnCentrar3D').addEventListener('click', function() {
+        siguiendo3D = true;
+        this.classList.add('oculto3d');
+        tick3D();
+    });
+
+    // Al abrir el 3D, volver a dibujar la ruta
+    document.getElementById('btnVista3D').addEventListener('click', function() {
+        rutaVista3D = null;
     });
 </script>
 
