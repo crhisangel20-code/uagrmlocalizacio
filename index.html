@@ -20,6 +20,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<!-- MapLibre (Vista 3D) -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
     <!-- Tipografías: Fraunces (identidad / herencia colonial) + Inter (utilitaria) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -1165,8 +1167,66 @@
             .portada-escudo { width: 100px; }
             .btn-ingresar { padding: 12px 24px; }
         }
-    </style>
     
+    /* ===== Vista 3D (MapLibre) ===== */
+.contenedor3d {
+    position: fixed;
+    inset: 0;
+    z-index: 10002;
+    background: #000;
+}
+.contenedor3d.hidden { display: none; }
+#mapa3d { width: 100%; height: 100%; }
+.btn-cerrar-3d {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 10003;
+    border: none;
+    background: var(--verde-oscuro);
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 30px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    font-family: var(--font-body);
+}
+.aviso-3d {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10003;
+    background: rgba(10,74,53,.92);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 14px;
+    font-size: .8rem;
+    max-width: 90vw;
+    text-align: center;
+}
+.pin3d {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+}
+.pin3d-usuario {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00cc44;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 6px rgba(0,204,68,.35);
+}
+</style>
 </head>
 <body>
 
@@ -1210,6 +1270,7 @@
             <button class="btn-estadisticas" id="btnEstadisticas">📊 Estadísticas</button>
 <button class="btn-estadisticas" id="btnMapaCalor" style="background: #E8622C;">🔥 Mapa de Calor</button>
 <button class="btn-estadisticas" id="btnEventos" style="background:#B23A48;">🎉 Eventos</button>
+<button class="btn-estadisticas" id="btnVista3D" style="background:#1B3B5F;">🧊 Vista 3D</button>
             <!-- BOTÓN PARA SUBIR HORARIO -->
             <button class="btn-geo" id="btnSubirHorario" style="background: var(--oro-escudo); color: var(--verde-oscuro);">
                 📄 Subir mi Horario (PDF)
@@ -1379,7 +1440,12 @@
         <button class="btn-cerrar-estadisticas" id="btnCerrarAdmin">Cerrar</button>
     </div>
 </div>
-
+<!-- Vista 3D (MapLibre) -->
+<div class="contenedor3d hidden" id="contenedor3D">
+    <button class="btn-cerrar-3d" id="btnCerrar3D">✖ Cerrar 3D</button>
+    <div id="mapa3d"></div>
+    <div class="aviso-3d">🖐️ Arrastra con 2 dedos hacia arriba/abajo para inclinar · gira con 2 dedos</div>
+</div>
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
@@ -1390,6 +1456,7 @@
 <!-- Librerías para el Mapa 3D y el Mapa de Calor -->
 <script src="https://cdn.osmbuildings.org/OSMBuildings-Leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
  <script>
   
     // AÑADIDO PARA GA4: función auxiliar segura para no romper el mapa si gtag no llegó a cargar
@@ -3926,6 +3993,136 @@ iniciarAdmin();
         }).addTo(map);
 
         mostrarToastCerca('🔥 Mostrando zonas de mayor tráfico estudiantil');
+    });
+    // ===============================================================
+    // VISTA 3D CON MAPLIBRE
+    // ===============================================================
+    let mapa3D = null;
+    let marcadorUsuario3D = null;
+
+    function crearMapa3D() {
+        mapa3D = new maplibregl.Map({
+            container: 'mapa3d',
+            style: 'https://tiles.openfreemap.org/styles/liberty',
+            center: [-63.1945, -17.7765],
+            zoom: 16.5,
+            pitch: 60,
+            bearing: -20,
+            maxPitch: 85
+        });
+        mapa3D.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+        mapa3D.on('load', function() {
+            // Quitamos la capa de edificios por defecto y ponemos la nuestra,
+            // con una altura mínima para que se vean en 3D aunque no tengan dato de altura.
+            if (mapa3D.getLayer('building-3d')) mapa3D.removeLayer('building-3d');
+
+            const capas = mapa3D.getStyle().layers;
+            let primeraEtiqueta;
+            for (let i = 0; i < capas.length; i++) {
+                if (capas[i].type === 'symbol') { primeraEtiqueta = capas[i].id; break; }
+            }
+
+            mapa3D.addLayer({
+                id: 'edificios-3d',
+                type: 'fill-extrusion',
+                source: 'openmaptiles',
+                'source-layer': 'building',
+                minzoom: 14,
+                paint: {
+                    'fill-extrusion-color': '#d9d2c3',
+                    'fill-extrusion-height': ['max', ['coalesce', ['get', 'render_height'], 8], 6],
+                    'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+                    'fill-extrusion-opacity': 0.92
+                }
+            }, primeraEtiqueta);
+
+            // Capa de la ruta (borde blanco + línea lila)
+            mapa3D.addSource('ruta3d', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            mapa3D.addLayer({
+                id: 'ruta3d-borde', type: 'line', source: 'ruta3d',
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': '#ffffff', 'line-width': 10 }
+            });
+            mapa3D.addLayer({
+                id: 'ruta3d-linea', type: 'line', source: 'ruta3d',
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': '#A855F7', 'line-width': 6 }
+            });
+
+            agregarMarcadores3D();
+            actualizarRuta3D();
+        });
+    }
+
+    function agregarMarcadores3D() {
+        edificios.forEach(function(ed) {
+            const c = CATEGORIAS[categorizar(ed.nombre)];
+            const el = document.createElement('div');
+            el.className = 'pin3d';
+            el.style.background = c.color;
+            el.textContent = c.icon;
+            const popup = new maplibregl.Popup({ offset: 18 })
+                .setHTML('<strong>' + esc(ed.nombre.replace(/^↪\s*/, '')) + '</strong>');
+            new maplibregl.Marker({ element: el })
+                .setLngLat([ed.lng, ed.lat])
+                .setPopup(popup)
+                .addTo(mapa3D);
+        });
+    }
+
+    function actualizarRuta3D() {
+        if (!mapa3D || !mapa3D.getSource('ruta3d')) return;
+
+        const coords = window.rutaCoordsActuales;
+        const fuente = mapa3D.getSource('ruta3d');
+
+        if (coords && coords.length > 1) {
+            const puntos = coords.map(function(p) { return [p.lng, p.lat]; });
+            fuente.setData({
+                type: 'Feature',
+                geometry: { type: 'LineString', coordinates: puntos }
+            });
+            const limites = new maplibregl.LngLatBounds();
+            puntos.forEach(function(p) { limites.extend(p); });
+            mapa3D.fitBounds(limites, { padding: 90, pitch: 60, maxZoom: 19 });
+        } else {
+            fuente.setData({ type: 'FeatureCollection', features: [] });
+            if (destinoActual) {
+                mapa3D.flyTo({ center: [destinoActual.lng, destinoActual.lat], zoom: 18, pitch: 60 });
+            }
+        }
+
+        // Punto verde de tu ubicación
+        if (userLocation) {
+            if (!marcadorUsuario3D) {
+                const el = document.createElement('div');
+                el.className = 'pin3d-usuario';
+                marcadorUsuario3D = new maplibregl.Marker({ element: el })
+                    .setLngLat([userLocation.lng, userLocation.lat])
+                    .addTo(mapa3D);
+            } else {
+                marcadorUsuario3D.setLngLat([userLocation.lng, userLocation.lat]);
+            }
+        }
+    }
+
+    document.getElementById('btnVista3D').addEventListener('click', function() {
+        document.getElementById('contenedor3D').classList.remove('hidden');
+        if (!mapa3D) {
+            crearMapa3D();
+        } else {
+            mapa3D.resize();
+            actualizarRuta3D();
+        }
+        enviarEventoGA4('vista_3d_abierta', { event_category: 'Mapa UAGRM' });
+    });
+
+    document.getElementById('btnCerrar3D').addEventListener('click', function() {
+        document.getElementById('contenedor3D').classList.add('hidden');
     });
 </script>
 
