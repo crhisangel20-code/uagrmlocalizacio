@@ -1,10 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>Mapa Inteligente UAGRM</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0A4A35">
     <link rel="icon" type="image/png" href="esscudo.png">
 
     <!-- ===== Open Graph: solo banner + enlace, sin descripción ===== -->
@@ -1429,9 +1430,99 @@
 .leyenda-3d summary { cursor:pointer; font-weight:700; }
 .leyenda-3d div div { display:flex; align-items:center; gap:6px; margin:3px 0; }
 .leyenda-3d i { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.25); }
+
+/* ===== AJUSTES CELULAR ===== */
+html { -webkit-text-size-adjust: 100%; }
+
+.tarjeta-destino-3d #btnLlevameTarjeta {
+    position: static; display: block; width: 100%; margin-top: 8px;
+    padding: 10px; border: none; border-radius: 10px;
+    background: #0B6E4F; color: #fff; font-weight: 700; font-size: .9rem; cursor: pointer;
+}
+
+@media (max-width: 700px) {
+
+    /* ---- Zona de búsqueda ---- */
+    .search-section label { font-size: 1rem; }
+    .search-section #targetid { min-height: 54px; font-size: 16px; }
+    .search-section #btnMiUbicacion { min-height: 56px; font-size: 1.05rem; }
+    .search-section #btnEstadisticas,
+    .search-section #btnEventos,
+    .search-section #btnSubirHorario {
+        min-height: 50px; font-size: .8rem; padding: 6px 4px; line-height: 1.2;
+    }
+    .leyenda { padding: 8px 10px; gap: 5px 10px; }
+    .leyenda-item { font-size: .72rem; }
+
+    /* ---- Mapa 3D ---- */
+    .contenedor3d { height: 62vh; height: 62dvh; min-height: 380px; }
+
+    .aviso-3d {
+        z-index: 10002; top: 8px; bottom: auto; font-size: .72rem;
+        padding: 6px 10px; pointer-events: none; width: max-content; max-width: 80vw;
+    }
+    .panel-guia-3d { top: 8px; width: calc(100% - 20px); z-index: 10004; }
+    .banner-giro-3d { padding: 8px 12px; gap: 10px; }
+    .banner-giro-3d .icono-giro { font-size: 1.5rem; }
+    .banner-giro-3d .texto-giro { font-size: .9rem; }
+    .banner-giro-3d small { font-size: .75rem; }
+
+    .leyenda-3d { top: 84px; left: 8px; font-size: .7rem; max-width: 55%; }
+    .btn-centrar-3d { top: 130px; bottom: auto; right: 10px; padding: 8px 12px; font-size: .8rem; }
+
+    .tarjeta-destino-3d {
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        width: calc(100% - 20px); max-height: 38%; overflow-y: auto;
+        padding: 8px 34px 8px 12px; font-size: .78rem; line-height: 1.35; border-radius: 12px;
+    }
+    .tarjeta-destino-3d h4 { font-size: .9rem; }
+
+    .dest3d-label { font-size: .68rem; padding: 3px 7px; max-width: 150px; }
+    .dest3d-flecha { font-size: 26px; }
+
+    /* ---- Panel de estado y botón "Empezar a caminar" ---- */
+    .info-panel { width: 100%; max-width: 100%; padding: 12px 14px; }
+    .info-panel .message { font-size: .9rem; }
+    .info-panel .btn-google { width: 100%; justify-content: center; min-height: 52px; font-size: 1rem; }
+
+    /* ---- Indicaciones paso a paso ---- */
+    .instrucciones-panel { padding: 12px 14px; }
+    .instrucciones-panel h3 { font-size: .95rem; }
+    .instrucciones-panel li { font-size: .9rem; line-height: 1.45; }
+
+    /* ---- Avisos y ventanas ---- */
+    .aviso-fuera-campus { padding: 12px 14px; }
+    .aviso-fuera-campus .aviso-texto { font-size: .85rem; }
+    .aviso-fuera-campus .btn-google-maps { width: 100%; justify-content: center; min-height: 46px; }
+    .toast-cerca { bottom: calc(14px + env(safe-area-inset-bottom)); width: calc(100% - 24px); padding: 10px 14px; }
+    .toast-cerca .toast-texto { font-size: .8rem; }
+    .modal-estadisticas { padding: 20px 16px; max-height: 85vh; }
+    .modal-llegada { padding: 24px 18px; }
+    .footer-note { font-size: .76rem; }
+}
+/* ===== MODO SIN INTERNET ===== */
+.off-oculto { display: none !important; }
+.banner-offline {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10010;
+    background: #B23A48; color: #fff; text-align: center;
+    padding: 8px 60px 8px 12px; font-size: .85rem; font-weight: 600;
+}
+.panel-offline {
+    margin-bottom: 16px; padding: 12px 16px; border-radius: 14px;
+    background: var(--bg-card); border: 1px dashed rgba(140,90,52,.4);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+}
+.panel-offline .estado-offline { flex: 1; min-width: 200px; font-size: .84rem; color: var(--text-main); line-height: 1.4; }
+.caja-barra-offline { width: 100%; height: 8px; background: rgba(11,110,79,.15); border-radius: 4px; overflow: hidden; }
+.caja-barra-offline div { height: 100%; width: 0; background: var(--verde-bandera); transition: width .3s; }
+@media (max-width: 700px) {
+    .panel-offline .btn-geo { width: 100%; min-height: 48px; }
+    .banner-offline { font-size: .78rem; }
+}
 </style>
 </head>
 <body>
+<div class="banner-offline off-oculto" id="bannerOffline"></div>
 
 <!-- ================= BOTÓN MODO OSCURO ================= -->
 <button class="btn-dark-toggle" id="btnDarkToggle" aria-label="Cambiar modo oscuro">🌙</button>
@@ -1485,6 +1576,11 @@
         </div>
 
         <div class="leyenda" id="leyenda"></div>
+        <div class="panel-offline" id="panelOffline">
+            <div class="estado-offline" id="estadoOffline">Comprobando…</div>
+            <button class="btn-geo" id="btnGuardarOffline">📥 Guardar mapa para usar sin internet</button>
+            <div class="caja-barra-offline off-oculto" id="cajaBarraOffline"><div id="barraOffline"></div></div>
+        </div>
 
         <!-- AÑADIDO PARA DETECCIÓN FUERA DEL CAMPUS: aviso de ubicación fuera del campus -->
         <div class="aviso-fuera-campus hidden" id="avisoFueraCampus">
@@ -1500,6 +1596,7 @@
     <div class="tarjeta-destino-3d oculto3d" id="tarjetaDestino3D">
         <button id="btnQuitarDestino3D" aria-label="Quitar destino">✖</button>
         <div id="tarjetaDestinoCuerpo"></div>
+        <button id="btnLlevameTarjeta">🚶 Llévame al destino</button>
     </div>
     <div class="aviso-3d">🖐️ Arrastra con 2 dedos hacia arriba/abajo para inclinar · gira con 2 dedos</div>
     <div class="panel-guia-3d">
@@ -4756,6 +4853,216 @@ document.getElementById('btnQuitarDestino3D').addEventListener('click', function
     Object.keys(pines3D).forEach(function(id) { pines3D[id].style.opacity = ''; });
     document.getElementById('tarjetaDestino3D').classList.add('oculto3d');
 });
+// Botón "Llévame" de la tarjeta: hace lo mismo que el botón de arriba
+document.getElementById('btnLlevameTarjeta').addEventListener('click', function() {
+    document.getElementById('btnMiUbicacion').click();
+});
+
+// El aviso "Arrastra con 2 dedos…" se oculta solo a los 8 segundos
+setTimeout(function() {
+    var aviso = document.querySelector('.aviso-3d');
+    if (aviso) aviso.style.display = 'none';
+}, 8000);
+// ===============================================================
+// MODO SIN INTERNET
+// ===============================================================
+const OFFLINE_CACHE = 'uagrm-mapa';
+const OFFLINE_CLAVE = 'uagrm_mapa_guardado';
+const OFFLINE_ESTILO = 'https://tiles.openfreemap.org/styles/liberty';
+// Zona que se guarda: el campus con un margen
+const OFFLINE_ZONA = { norte: -17.7655, sur: -17.7865, oeste: -63.2065, este: -63.1860 };
+let hayInternet = navigator.onLine;
+
+function lonATile(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
+function latATile(lat, z) {
+    const r = lat * Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+}
+
+function datosOffline() {
+    try { return JSON.parse(localStorage.getItem(OFFLINE_CLAVE) || 'null'); } catch (e) { return null; }
+}
+
+function actualizarBannerConexion() {
+    const b = document.getElementById('bannerOffline');
+    if (hayInternet) { b.classList.add('off-oculto'); return; }
+    b.textContent = datosOffline()
+        ? '📴 Sin conexión · usando el mapa guardado'
+        : '📴 Sin conexión · el mapa puede verse incompleto';
+    b.classList.remove('off-oculto');
+}
+
+function refrescarPanelOffline() {
+    const estado = document.getElementById('estadoOffline');
+    const btn = document.getElementById('btnGuardarOffline');
+    if (!('serviceWorker' in navigator) || !window.caches) {
+        estado.textContent = '❌ Este navegador no permite el modo sin internet.';
+        btn.disabled = true;
+        return;
+    }
+    const d = datosOffline();
+    const controla = !!navigator.serviceWorker.controller;
+    if (!d) {
+        estado.textContent = '⚠️ Aún no guardaste el mapa. Sin internet no se vería.';
+    } else if (!controla) {
+        estado.textContent = '🔄 Mapa guardado. Recarga la página una vez para activar el modo sin internet.';
+    } else {
+        estado.textContent = '✅ Listo: mapa guardado el ' + new Date(d.fecha).toLocaleDateString('es-BO') + '. Funciona sin internet.';
+    }
+    if (d) btn.textContent = '🔄 Actualizar mapa guardado';
+    actualizarBannerConexion();
+}
+
+async function guardarMapaOffline() {
+    const btn = document.getElementById('btnGuardarOffline');
+    const estado = document.getElementById('estadoOffline');
+    const caja = document.getElementById('cajaBarraOffline');
+    const barra = document.getElementById('barraOffline');
+
+    if (!hayInternet) { estado.textContent = '⚠️ Necesitas internet para guardar el mapa.'; return; }
+    btn.disabled = true;
+    caja.classList.remove('off-oculto');
+    barra.style.width = '3%';
+    estado.textContent = '⏳ Guardando el mapa…';
+
+    try {
+        const cache = await caches.open(OFFLINE_CACHE);
+        const traer = async function(url) {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(r.status + ' ' + url);
+            await cache.put(url, r.clone());
+            return r;
+        };
+
+        // 1) El estilo del mapa
+        const estilo = await (await traer(OFFLINE_ESTILO)).json();
+        const urls = [];
+
+        // 2) Los cuadros del mapa (calles y edificios) de la zona del campus
+        for (const nombre of Object.keys(estilo.sources || {})) {
+            const fuente = estilo.sources[nombre];
+            if (fuente.type !== 'vector') continue;
+            let plantillas = fuente.tiles, zMax = fuente.maxzoom;
+            if (!plantillas && fuente.url) {
+                const tj = await (await traer(fuente.url)).json();
+                plantillas = tj.tiles; zMax = tj.maxzoom;
+            }
+            if (!plantillas || !plantillas.length) continue;
+            zMax = Math.min(zMax == null ? 14 : zMax, 15);
+            for (let z = 6; z <= zMax; z++) {
+                const x1 = lonATile(OFFLINE_ZONA.oeste, z), x2 = lonATile(OFFLINE_ZONA.este, z);
+                const y1 = latATile(OFFLINE_ZONA.norte, z), y2 = latATile(OFFLINE_ZONA.sur, z);
+                for (let x = x1; x <= x2; x++) {
+                    for (let y = y1; y <= y2; y++) {
+                        urls.push(plantillas[0].replace('{z}', z).replace('{x}', x).replace('{y}', y));
+                    }
+                }
+            }
+        }
+
+        // 3) Iconos del mapa
+        if (estilo.sprite) {
+            ['.json', '.png', '@2x.json', '@2x.png'].forEach(function(s) { urls.push(estilo.sprite + s); });
+        }
+
+        // 4) Letras del mapa (nombres de calles y lugares)
+        if (estilo.glyphs) {
+            const pilas = new Set();
+            (estilo.layers || []).forEach(function(capa) {
+                const f = capa.layout && capa.layout['text-font'];
+                if (!f) return;
+                if (Array.isArray(f) && f.every(function(x) { return typeof x === 'string' && /^[A-Z]/.test(x); })) {
+                    pilas.add(f.join(','));
+                } else {
+                    JSON.stringify(f).replace(/"([A-Z][^"]*)"/g, function(m, nf) { pilas.add(nf); return m; });
+                }
+            });
+            pilas.forEach(function(p) {
+                ['0-255', '256-511'].forEach(function(r) {
+                    urls.push(estilo.glyphs.replace('{fontstack}', p).replace('{range}', r));
+                });
+            });
+        }
+
+        // Descargamos de a 5 a la vez, mostrando el avance
+        const total = urls.length;
+        let siguiente = 0, hechos = 0, fallos = 0;
+        const obrero = async function() {
+            while (siguiente < total) {
+                const url = urls[siguiente++];
+                try { await traer(url); } catch (e) { fallos++; }
+                hechos++;
+                barra.style.width = Math.round(5 + 95 * hechos / total) + '%';
+            }
+        };
+        await Promise.all([obrero(), obrero(), obrero(), obrero(), obrero()]);
+
+        if (total === 0 || fallos > total / 2) throw new Error('Fallaron demasiados archivos');
+
+        localStorage.setItem(OFFLINE_CLAVE, JSON.stringify({ fecha: Date.now(), archivos: total - fallos }));
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+        barra.style.width = '100%';
+        mostrarToastCerca('✅ Mapa guardado. Ya puedes usarlo sin internet.');
+    } catch (err) {
+        console.error('No se pudo guardar el mapa:', err);
+        estado.textContent = '❌ No se pudo guardar. Revisa tu internet e intenta de nuevo.';
+        btn.disabled = false;
+        caja.classList.add('off-oculto');
+        return;
+    }
+
+    btn.disabled = false;
+    setTimeout(function() { caja.classList.add('off-oculto'); }, 1500);
+    refrescarPanelOffline();
+}
+
+// ¿Hay internet de verdad? (el celular puede estar en wifi sin salida a internet)
+async function probarInternet() {
+    try {
+        const c = new AbortController();
+        const t = setTimeout(function() { c.abort(); }, 5000);
+        await fetch('manifest.json?ping=' + Date.now(), { cache: 'no-store', signal: c.signal });
+        clearTimeout(t);
+        return true;
+    } catch (e) { return false; }
+}
+
+async function revisarConexion() {
+    const ahora = navigator.onLine ? await probarInternet() : false;
+    if (ahora !== hayInternet) {
+        hayInternet = ahora;
+        mostrarToastCerca(ahora ? '✅ Conexión recuperada.' : '📴 Sin conexión. Se usará el mapa guardado.');
+    }
+    actualizarBannerConexion();
+}
+
+document.getElementById('btnGuardarOffline').addEventListener('click', guardarMapaOffline);
+window.addEventListener('online', revisarConexion);
+window.addEventListener('offline', revisarConexion);
+setInterval(revisarConexion, 20000);
+
+// Registrar el "guardián" (service worker)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js')
+            .then(function() { return navigator.serviceWorker.ready; })
+            .then(refrescarPanelOffline)
+            .catch(function(e) { console.warn('Modo sin internet no disponible:', e); });
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', refrescarPanelOffline);
+}
+
+// Invitar a guardar el mapa si aún no lo hizo
+document.getElementById('btnIngresar').addEventListener('click', function() {
+    setTimeout(function() {
+        if (!datosOffline() && hayInternet) {
+            mostrarToastCerca('💡 Toca "Guardar mapa" para usarlo sin internet.');
+        }
+    }, 1500);
+});
+
+refrescarPanelOffline();
+revisarConexion();
 // Crear el mapa 3D como mapa principal
 crearMapa3D();
 </script>
