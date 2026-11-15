@@ -1390,6 +1390,45 @@
 /* ===== MEJORA 2 - Paso 3: quitar lo repetido ===== */
 .fila-guia-3d { display: none !important; }   /* lista + "Guiarme" dentro del mapa 3D */
 #btnRecentrar { display: none !important; }   /* "Centrar Mapa" viejo (movía el mapa escondido) */
+
+/* ===== Destino visible en 3D ===== */
+.dest3d { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
+.dest3d-label {
+    background:#ff1744; color:#fff; font-weight:700; font-size:.78rem;
+    padding:5px 10px; border-radius:10px; border:2px solid #fff;
+    box-shadow:0 4px 12px rgba(0,0,0,.4); max-width:200px; text-align:center;
+}
+.dest3d-flecha {
+    color:#ff1744; font-size:34px; line-height:1; -webkit-text-stroke:2px #fff;
+    animation:rebote3d .7s ease-in-out infinite alternate;
+}
+@keyframes rebote3d { from { transform:translateY(-6px); } to { transform:translateY(6px); } }
+
+.tarjeta-destino-3d {
+    position:absolute; left:50%; bottom:44px; transform:translateX(-50%);
+    z-index:10003; width:min(92vw,420px);
+    background:rgba(255,255,255,.96); color:#1C2620;
+    border-radius:14px; padding:12px 38px 12px 14px;
+    box-shadow:0 6px 20px rgba(0,0,0,.35); font-size:.84rem; line-height:1.45;
+    border-left:6px solid #ff1744;
+}
+.tarjeta-destino-3d h4 { font-family:var(--font-display); font-size:.98rem; color:#0A4A35; margin-bottom:4px; }
+.tarjeta-destino-3d p { margin:2px 0; }
+.tarjeta-destino-3d button {
+    position:absolute; top:6px; right:8px; border:none; background:none;
+    font-size:1.1rem; cursor:pointer; color:#666;
+}
+
+/* ===== Leyenda de colores por facultad (3D) ===== */
+.leyenda-3d {
+    position:absolute; left:10px; top:60px; z-index:10003;
+    background:rgba(255,255,255,.94); color:#1C2620;
+    padding:6px 10px; border-radius:12px; font-size:.72rem;
+    box-shadow:0 4px 14px rgba(0,0,0,.3); max-height:45%; overflow-y:auto;
+}
+.leyenda-3d summary { cursor:pointer; font-weight:700; }
+.leyenda-3d div div { display:flex; align-items:center; gap:6px; margin:3px 0; }
+.leyenda-3d i { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.25); }
 </style>
 </head>
 <body>
@@ -1457,6 +1496,11 @@
 <div class="contenedor3d" id="contenedor3D">
     <button class="btn-cerrar-3d" id="btnCerrar3D">✖ Cerrar 3D</button>
     <div id="mapa3d"></div>
+    <div class="leyenda-3d"><details><summary>🎨 Facultades</summary><div id="leyenda3D"></div></details></div>
+    <div class="tarjeta-destino-3d oculto3d" id="tarjetaDestino3D">
+        <button id="btnQuitarDestino3D" aria-label="Quitar destino">✖</button>
+        <div id="tarjetaDestinoCuerpo"></div>
+    </div>
     <div class="aviso-3d">🖐️ Arrastra con 2 dedos hacia arriba/abajo para inclinar · gira con 2 dedos</div>
     <div class="panel-guia-3d">
         <div class="fila-guia-3d">
@@ -2345,7 +2389,8 @@ try { new OSMBuildings(map).load(); } catch (e) { console.warn('Mapa 3D no dispo
         const latlng = markers[id].getLatLng();
         map.setView(latlng, 18, { animate: true });
        markers[id].openPopup();
-if (mapa3D) mapa3D.flyTo({ center: [latlng.lng, latlng.lat], zoom: 18, pitch: 60, duration: 1200 });
+enfocarDestino3D(edificioSeleccionado);
+document.getElementById('contenedor3D').scrollIntoView({ behavior: 'smooth', block: 'center' });
 limpiarCapaRuta();
         document.getElementById('infoPanel').classList.remove('solo-boton'); // AÑADIDO: volver a mostrar el texto de estado
         document.getElementById('statusMessage').textContent = '📍 Listo. Ahora toca "Llévame al destino".';
@@ -3118,7 +3163,7 @@ if (!esRecalculoAutomatico) {
         if (window.destMarker) { map.removeLayer(window.destMarker); window.destMarker = null; }
         
         // Centramos el mapa en el edificio destino para que el usuario vea dónde queda
-        map.setView([destino.lat, destino.lng], 18, { animate: true });
+        enfocarDestino3D(destino);
         
         return; // Detenemos la función aquí para que no dibuje el garabato
     }
@@ -4157,6 +4202,8 @@ paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0 }
             });
 
             agregarMarcadores3D();
+            iniciarColoresModulos();
+            iniciarResalteDestino();
             actualizarRuta3D();
         });
     }
@@ -4358,6 +4405,14 @@ paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0 }
         // Dibujar la ruta cuando cambia
         if (coords !== rutaVista3D) {
             rutaVista3D = coords;
+            if (coords && coords.length > 1 && !guiando3D) {
+                const lim = new maplibregl.LngLatBounds();
+                coords.forEach(function(p) { lim.extend([p.lng, p.lat]); });
+                mapa3D.fitBounds(lim, {
+                    padding: { top: 90, bottom: 120, left: 40, right: 40 },
+                    pitch: 50, maxZoom: 19, duration: 1200
+                });
+            }
             mapa3D.getSource('ruta3d').setData(
                 coords && coords.length > 1
                     ? { type: 'Feature', geometry: { type: 'LineString', coordinates: coords.map(function(p) { return [p.lng, p.lat]; }) } }
@@ -4421,7 +4476,7 @@ paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0 }
         }
 
         // La cámara te sigue y gira hacia donde debes caminar
-        if (siguiendo3D) {
+                if (siguiendo3D && guiando3D) {
             document.getElementById('btnCentrar3D').classList.add('oculto3d');
             mapa3D.easeTo({
                 center: [userLocation.lng, userLocation.lat],
@@ -4456,6 +4511,251 @@ paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0 }
     document.getElementById('btnVista3D').addEventListener('click', function() {
         rutaVista3D = null;
     });
+// ===============================================================
+// COLORES POR FACULTAD (los colores son una PROPUESTA, cámbialos
+// por los oficiales cuando los tengas)
+// ===============================================================
+const FACULTADES = {
+    tecnologia:   { nombre: 'Tecnología / Cs. Exactas',   color: '#F28C28' },
+    politecnica:  { nombre: 'Politécnica',                color: '#8E6BBF' },
+    informatica:  { nombre: 'Informática',                color: '#1E88E5' },
+    veterinaria:  { nombre: 'Veterinaria',                color: '#43A047' },
+    humanidades:  { nombre: 'Humanidades',                color: '#D81B60' },
+    economicas:   { nombre: 'Cs. Económicas',             color: '#FDD835' },
+    contaduria:   { nombre: 'Contaduría Pública',         color: '#8D6E63' },
+    salud:        { nombre: 'Cs. de la Salud (Medicina)', color: '#E53935' },
+    odontologia:  { nombre: 'Odontología',                color: '#26C6DA' },
+    derecho:      { nombre: 'Cs. Jurídicas',              color: '#3949AB' },
+    bioquimica:   { nombre: 'Bioquímica y Farmacia',      color: '#00897B' }
+};
+
+function facultadDe(nombre) {
+    const n = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (n.includes('politecnica')) return 'politecnica';
+    if (n.includes('contaduria')) return 'contaduria';
+    if (n.includes('informatica')) return 'informatica';
+    if (n.includes('veterinari') || n.includes('animales')) return 'veterinaria';
+    if (n.includes('odontolog')) return 'odontologia';
+    if (n.includes('salud humana') || n.includes('morgue')) return 'salud';
+    if (n.includes('juridicas')) return 'derecho';
+    if (n.includes('bioquimica')) return 'bioquimica';
+    if (n.includes('humanidades')) return 'humanidades';
+    if (n.includes('tecnolog') || n.includes('exactas') || n.includes('ingenier') || n.includes('fisica')) return 'tecnologia';
+    if (n.includes('economicas')) return 'economicas';
+    return null;
+}
+
+const modulosColoreados = new Set();
+const poligonosUsados = new Set();
+const featuresColor = [];
+
+function pintarModulos3D() {
+    if (!mapa3D || !mapa3D.getSource('modulos-color') || mapa3D.getZoom() < 15.5) return;
+    let cambios = false;
+
+    edificios.forEach(function(ed) {
+        if (modulosColoreados.has(ed.id)) return;
+        const fac = facultadDe(ed.nombre);
+        if (!fac) { modulosColoreados.add(ed.id); return; }
+
+        const p = mapa3D.project([ed.lng, ed.lat]);
+        const candidatos = mapa3D.queryRenderedFeatures(
+            [[p.x - 20, p.y - 20], [p.x + 20, p.y + 20]],
+            { layers: ['edificios-3d'] }
+        );
+
+        for (const f of candidatos) {
+            const g = f.geometry;
+            const poligonos = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+            const contiene = poligonos.some(function(poli) {
+                return puntoEnPoligono(ed.lat, ed.lng, poli[0].map(function(c) { return [c[1], c[0]]; }));
+            });
+            if (!contiene) continue;
+
+            const clave = JSON.stringify(poligonos[0][0][0]);
+            modulosColoreados.add(ed.id);
+            if (poligonosUsados.has(clave)) return;
+            poligonosUsados.add(clave);
+
+            featuresColor.push({
+                type: 'Feature',
+                geometry: g,
+                properties: {
+                    color: FACULTADES[fac].color,
+                    h: Math.max(Number(f.properties.render_height) || 8, 6) + 0.4,
+                    base: Number(f.properties.render_min_height) || 0
+                }
+            });
+            cambios = true;
+            return;
+        }
+    });
+
+    if (cambios) {
+        mapa3D.getSource('modulos-color').setData({ type: 'FeatureCollection', features: featuresColor });
+    }
+}
+
+function iniciarColoresModulos() {
+    mapa3D.addSource('modulos-color', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    mapa3D.addLayer({
+        id: 'modulos-color-3d',
+        type: 'fill-extrusion',
+        source: 'modulos-color',
+        paint: {
+            'fill-extrusion-color': ['get', 'color'],
+            'fill-extrusion-height': ['get', 'h'],
+            'fill-extrusion-base': ['get', 'base'],
+            'fill-extrusion-opacity': 0.95
+        }
+    }, 'ruta3d-borde');
+
+    document.getElementById('leyenda3D').innerHTML = Object.values(FACULTADES).map(function(f) {
+        return '<div><i style="background:' + f.color + '"></i>' + f.nombre + '</div>';
+    }).join('');
+
+    mapa3D.on('idle', pintarModulos3D);
+    mapa3D.on('moveend', pintarModulos3D);
+}
+
+// ===============================================================
+// DESTINO BIEN VISIBLE + TARJETA "DÓNDE QUEDA"
+// ===============================================================
+const DIRS_CARDINALES = ['norte','noreste','este','sureste','sur','suroeste','oeste','noroeste'];
+function dirCardinal(lat1, lng1, lat2, lng2) {
+    return DIRS_CARDINALES[Math.round(calcularRumbo(lat1, lng1, lat2, lng2) / 45) % 8];
+}
+function nombreCorto(n) { return n.replace(/^↪\s*/, ''); }
+
+let resalteActivo = false;
+
+function poligonoDeModulo(ed) {
+    const p = mapa3D.project([ed.lng, ed.lat]);
+    const candidatos = mapa3D.queryRenderedFeatures(
+        [[p.x - 25, p.y - 25], [p.x + 25, p.y + 25]],
+        { layers: ['edificios-3d'] }
+    );
+    for (const f of candidatos) {
+        const g = f.geometry;
+        const polis = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+        const contiene = polis.some(function(poli) {
+            return puntoEnPoligono(ed.lat, ed.lng, poli[0].map(function(c) { return [c[1], c[0]]; }));
+        });
+        if (contiene) {
+            return {
+                type: 'Feature',
+                geometry: g,
+                properties: {
+                    h: Math.max(Number(f.properties.render_height) || 8, 6) + 1,
+                    base: Number(f.properties.render_min_height) || 0
+                }
+            };
+        }
+    }
+    return null;
+}
+
+function iniciarResalteDestino() {
+    mapa3D.addSource('destino-resalte', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    mapa3D.addLayer({
+        id: 'destino-resalte-3d',
+        type: 'fill-extrusion',
+        source: 'destino-resalte',
+        paint: {
+            'fill-extrusion-color': '#ff1744',
+            'fill-extrusion-height': ['get', 'h'],
+            'fill-extrusion-base': ['get', 'base'],
+            'fill-extrusion-opacity': 0.9
+        }
+    }, 'ruta3d-borde');
+
+    (function pulso(t) {
+        if (resalteActivo && mapa3D.getLayer('destino-resalte-3d')) {
+            mapa3D.setPaintProperty('destino-resalte-3d', 'fill-extrusion-opacity', 0.6 + 0.3 * Math.sin(t / 350));
+        }
+        requestAnimationFrame(pulso);
+    })(0);
+}
+
+function resaltarEdificio3D(ed) {
+    if (!mapa3D || !mapa3D.getSource('destino-resalte')) return;
+    const f = poligonoDeModulo(ed);
+    resalteActivo = !!f;
+    mapa3D.getSource('destino-resalte').setData(
+        f ? { type: 'FeatureCollection', features: [f] } : { type: 'FeatureCollection', features: [] }
+    );
+}
+
+function mostrarMarcadorDestino3D(ed) {
+    if (destino3D) destino3D.remove();
+    const el = document.createElement('div');
+    el.className = 'dest3d';
+    el.style.zIndex = 20;
+    el.innerHTML = '<div class="dest3d-label">' + esc(nombreCorto(ed.nombre)) + '</div><div class="dest3d-flecha">▼</div>';
+    destino3D = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([ed.lng, ed.lat]).addTo(mapa3D);
+    destinoIdMostrado3D = ed.id;
+
+    Object.keys(pines3D).forEach(function(id) {
+        pines3D[id].style.opacity = String(id) === String(ed.id) ? '0' : '0.35';
+    });
+}
+
+function mostrarTarjetaDestino(ed) {
+    const refs = edificios
+        .filter(function(e) {
+            return e.id !== ed.id &&
+                /biblioteca|comedor|estadio|coliseo|gimnasio|rectorado|snack|aula magna|hospital|estacionamiento/i.test(e.nombre);
+        })
+        .map(function(e) { return { e: e, d: distancia(ed.lat, ed.lng, e.lat, e.lng) * 1000 }; })
+        .filter(function(r) { return r.d <= 300; })
+        .sort(function(a, b) { return a.d - b.d; })
+        .slice(0, 2);
+
+    let html = '<h4>📍 ' + esc(nombreCorto(ed.nombre)) + '</h4>';
+    const f = facultadDe(ed.nombre);
+    if (f && FACULTADES[f]) html += '<p>🎓 ' + esc(FACULTADES[f].nombre) + '</p>';
+
+    refs.forEach(function(r) {
+        const dir = dirCardinal(r.e.lat, r.e.lng, ed.lat, ed.lng);
+        html += '<p>🧭 A ' + Math.round(r.d) + ' m al ' + dir + ' de ' + esc(nombreCorto(r.e.nombre)) + '</p>';
+    });
+
+    if (userLocation) {
+        const dU = distancia(userLocation.lat, userLocation.lng, ed.lat, ed.lng) * 1000;
+        if (dU > 1500) {
+            html += '<p>⚠️ Estás fuera del campus.</p>';
+        } else {
+            html += '<p>🚶 Estás a ' + Math.round(dU) + ' m; queda hacia el ' +
+                    dirCardinal(userLocation.lat, userLocation.lng, ed.lat, ed.lng) + '.</p>';
+        }
+    } else {
+        html += '<p>👉 Toca "Llévame al destino" para que la pelotita te guíe.</p>';
+    }
+    document.getElementById('tarjetaDestinoCuerpo').innerHTML = html;
+    document.getElementById('tarjetaDestino3D').classList.remove('oculto3d');
+}
+
+function enfocarDestino3D(ed) {
+    if (!ed || !mapa3D) return;
+    mostrarMarcadorDestino3D(ed);
+    mostrarTarjetaDestino(ed);
+    mapa3D.flyTo({ center: [ed.lng, ed.lat], zoom: 18.3, pitch: 55, duration: 1200 });
+    mapa3D.once('moveend', function() {
+        setTimeout(function() { resaltarEdificio3D(ed); }, 400);
+    });
+}
+
+document.getElementById('btnQuitarDestino3D').addEventListener('click', function() {
+    if (destino3D) { destino3D.remove(); destino3D = null; }
+    destinoIdMostrado3D = null;
+    resalteActivo = false;
+    if (mapa3D.getSource('destino-resalte')) {
+        mapa3D.getSource('destino-resalte').setData({ type: 'FeatureCollection', features: [] });
+    }
+    Object.keys(pines3D).forEach(function(id) { pines3D[id].style.opacity = ''; });
+    document.getElementById('tarjetaDestino3D').classList.add('oculto3d');
+});
 // Crear el mapa 3D como mapa principal
 crearMapa3D();
 </script>
