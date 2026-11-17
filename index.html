@@ -5730,6 +5730,112 @@ if (mapa3D) {
     ajustarMapa();
     window.addEventListener('resize', ajustarMapa);
 })();
+// ===============================================================
+// PASO 6: línea de burbujas a lo largo de la ruta
+// (la pelotita ping-pong sigue funcionando igual)
+// ===============================================================
+(function() {
+    const ESPACIO_METROS = 3.5;      // distancia entre burbujas
+    const PERIODO_OLA_MS = 1400;     // velocidad de la ola
+    const BURBUJAS_POR_OLA = 9;      // largo de la ola (en burbujas)
+
+    let capaCreada = false;
+    let coordsBase = null;           // ruta para la que se calcularon los puntos
+    let puntos = [];                 // [{lat, lng}]
+    let hayDatos = false;
+    let colorActual = null;
+
+    function crearCapa() {
+        if (capaCreada || !mapa3D || !mapa3D.getSource('ruta3d')) return;
+        try {
+            mapa3D.addSource('burbujas-ruta', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            const antes = mapa3D.getLayer('modulos-etiquetas-texto') ? 'modulos-etiquetas-texto' : undefined;
+            mapa3D.addLayer({
+                id: 'burbujas-ruta-capa',
+                type: 'circle',
+                source: 'burbujas-ruta',
+                paint: {
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'],
+                        15, ['*', ['get', 'k'], 2.5],
+                        17, ['*', ['get', 'k'], 4.5],
+                        19, ['*', ['get', 'k'], 7.5],
+                        20, ['*', ['get', 'k'], 11]],
+                    'circle-color': '#A855F7',
+                    'circle-opacity': ['+', 0.45, ['*', ['get', 'k'], 0.5]],
+                    'circle-stroke-color': '#ffffff',
+                    'circle-stroke-width': 1.5,
+                    'circle-stroke-opacity': 0.9,
+                    'circle-pitch-alignment': 'map'
+                }
+            }, antes);
+            capaCreada = true;
+            colorActual = '#A855F7';
+        } catch (e) {
+            console.warn('No se pudo crear la línea de burbujas:', e);
+        }
+    }
+
+    // Reparte puntos cada ESPACIO_METROS sobre la ruta actual (usa las
+    // mismas funciones que la pelotita: GUIA y puntoEnRuta)
+    function calcularPuntos() {
+        puntos = [];
+        const total = GUIA.total;
+        if (!total || total < 2) return;
+        const n = Math.max(2, Math.floor(total / ESPACIO_METROS));
+        for (let i = 0; i <= n; i++) {
+            puntos.push(puntoEnRuta(total * i / n));
+        }
+    }
+
+    function limpiar() {
+        if (hayDatos && capaCreada) {
+            mapa3D.getSource('burbujas-ruta').setData({ type: 'FeatureCollection', features: [] });
+        }
+        hayDatos = false;
+        coordsBase = null;
+        puntos = [];
+    }
+
+    function actualizar() {
+        if (document.visibilityState !== 'visible') return;
+        if (!mapa3D) return;
+        crearCapa();
+        if (!capaCreada) return;
+
+        if (!GUIA.coords || GUIA.coords.length < 2) { limpiar(); return; }
+
+        if (GUIA.coords !== coordsBase) {
+            coordsBase = GUIA.coords;
+            calcularPuntos();
+        }
+        if (!puntos.length) return;
+
+        // Color: verde cuando estás cerca, igual que la pelotita
+        const color = GUIA.cerca === true ? '#22C55E' : '#A855F7';
+        if (color !== colorActual) {
+            mapa3D.setPaintProperty('burbujas-ruta-capa', 'circle-color', color);
+            colorActual = color;
+        }
+
+        // Ola: cada burbuja crece y se encoge un poco más tarde que la anterior
+        const t = performance.now() / PERIODO_OLA_MS;
+        const features = puntos.map(function(p, i) {
+            const k = 0.55 + 0.45 * Math.sin(2 * Math.PI * (t - i / BURBUJAS_POR_OLA));
+            return {
+                type: 'Feature',
+                properties: { k: k },
+                geometry: { type: 'Point', coordinates: [p.lng, p.lat] }
+            };
+        });
+        mapa3D.getSource('burbujas-ruta').setData({ type: 'FeatureCollection', features: features });
+        hayDatos = true;
+    }
+
+    setInterval(actualizar, 70);
+})();
 </script>
 
 </body>
