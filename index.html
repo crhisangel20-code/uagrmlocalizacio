@@ -5065,6 +5065,671 @@ refrescarPanelOffline();
 revisarConexion();
 // Crear el mapa 3D como mapa principal
 crearMapa3D();
+// ===============================================================
+// MEJORAS V2 (pasos 1 y 2): pantalla encendida, retomar ruta, llegada
+// ===============================================================
+
+// ---------- A. Mantener la pantalla encendida mientras caminas ----------
+let pantallaBloqueo = null;
+let ultimoIntentoPantalla = 0;
+
+async function mantenerPantallaEncendida() {
+    ultimoIntentoPantalla = Date.now();
+    if (pantallaBloqueo || !('wakeLock' in navigator)) return;
+    try {
+        pantallaBloqueo = await navigator.wakeLock.request('screen');
+        pantallaBloqueo.addEventListener('release', function() { pantallaBloqueo = null; });
+    } catch (e) {
+        console.warn('No se pudo mantener la pantalla encendida:', e);
+    }
+}
+
+function soltarPantalla() {
+    if (pantallaBloqueo) {
+        pantallaBloqueo.release().catch(function() {});
+        pantallaBloqueo = null;
+    }
+}
+
+// ---------- B. Guardar y retomar la ruta ----------
+const CLAVE_NAV = 'uagrm_navegacion_activa';
+const VIGENCIA_NAV_MS = 45 * 60 * 1000; // 45 minutos
+
+function guardarNavegacion() {
+    if (!destinoActual) return;
+    try {
+        localStorage.setItem(CLAVE_NAV, JSON.stringify({ id: destinoActual.id, t: Date.now() }));
+    } catch (e) {}
+}
+
+function olvidarNavegacion() {
+    try { localStorage.removeItem(CLAVE_NAV); } catch (e) {}
+}
+
+function retomarNavegacionGuardada() {
+    let g = null;
+    try { g = JSON.parse(localStorage.getItem(CLAVE_NAV) || 'null'); } catch (e) {}
+    if (!g || Date.now() - g.t > VIGENCIA_NAV_MS) { olvidarNavegacion(); return; }
+
+    const ed = edificios.find(function(e) { return e.id === g.id; });
+    if (!ed || !navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        // Si estás lejos del campus no tiene sentido retomar
+        if (distanciaMinimaASenderos(lat, lng) > 200) { olvidarNavegacion(); return; }
+
+        const portada = document.getElementById('portada');
+        if (portada) portada.classList.add('oculto');
+        mostrarToastCerca('🔄 Retomando tu ruta…');
+
+        userLocation = { lat: lat, lng: lng };
+        select.value = String(ed.id);
+        selectedBuildingId = ed.id;
+        enfocarDestino3D(ed);
+        planificarRuta(userLocation, ed, { recalculoAutomatico: true }); // no cuenta como visita nueva
+
+        let intentos = 0;
+        const espera = setInterval(function() {
+            intentos++;
+            if (!btnIniciarRutaPie.classList.contains('hidden')) {
+                clearInterval(espera);
+                btnIniciarRutaPie.click();
+            } else if (intentos > 10) {
+                clearInterval(espera);
+            }
+        }, 1000);
+    }, function() {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 });
+}
+setTimeout(retomarNavegacionGuardada, 2500);
+
+// Al volver a la página (tras bloquear/desbloquear), reactivar todo
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    if (!destinoActual || watchId === null) return;
+    mantenerPantallaEncendida();
+    if (mapa3D) mapa3D.resize();
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        vigilarLlegada();
+        if (destinoActual) {
+            planificarRuta(userLocation, destinoActual, { recalculoAutomatico: true });
+        }
+    }, function() {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+});
+
+// ---------- C. Limpieza total de la navegación (como Google Maps) ----------
+let metrosCaminados = 0;
+let ultimaPosCaminata = null;
+
+function cerrarNavegacion() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    modoNavegacionActivo = false;
+    guiando3D = false;
+    siguiendo3D = true;
+    tipoRutaActual = null;
+    limpiarCapaRuta();
+    window.rutaCoordsActuales = null;
+    window.distanciaTotalRutaMetros = null;
+    soltarPantalla();
+    olvidarNavegacion();
+    metrosCaminados = 0;
+    ultimaPosCaminata = null;
+
+    if (mapa3D) {
+        ['ruta3d', 'destino-resalte'].forEach(function(id) {
+            const s = mapa3D.getSource(id);
+            if (s) s.setData({ type: 'FeatureCollection', features: [] });
+        });
+        const centro = userLocation ? [userLocation.lng, userLocation.lat] : mapa3D.getCenter();
+        mapa3D.easeTo({ center: centro, pitch: 50, bearing: 0, zoom: 17.5, duration: 1200 });
+    }
+    resalteActivo = false;
+    if (flecha3D) flecha3D.getElement().style.display = 'none';
+    if (orbe3D) orbe3D.getElement().style.display = 'none';
+    if (destino3D) { destino3D.remove(); destino3D = null; }
+    destinoIdMostrado3D = null;
+    rutaVista3D = null;
+    ['bannerGiro3D', 'btnCentrar3D', 'tarjetaDestino3D'].forEach(function(id) {
+        document.getElementById(id).classList.add('oculto3d');
+    });
+    Object.keys(pines3D).forEach(function(id) { pines3D[id].style.opacity = ''; });
+
+    ['originMarker', 'destMarker'].forEach(function(k) {
+        if (window[k]) { map.removeLayer(window[k]); window[k] = null; }
+    });
+    if (circuloDestino) { map.removeLayer(circuloDestino); circuloDestino = null; }
+
+    destinoActual = null;
+    selectedBuildingId = null;
+    select.value = '';
+    document.getElementById('selectDestino3D').value = '';
+    document.getElementById('infoPanel').classList.remove('solo-boton');
+    btnIniciarRutaPie.classList.add('hidden');
+    document.getElementById('btnRecentrar').classList.add('hidden');
+    panelInstrucciones.classList.add('hidden');
+    statusMsg.textContent = '🌍 Elige a dónde quieres ir y toca "Llévame al destino".';
+}
+
+// Reemplaza la función original: al llegar, muestra el mensaje y limpia todo
+function finalizarRuta(destino, precisionGPS, distanciaRecorrido) {
+    if (window.alertaLlegadaMostrada) return;
+    window.alertaLlegadaMostrada = true;
+    const metros = metrosCaminados > 5
+        ? metrosCaminados
+        : (window.distanciaTotalRutaMetros || distanciaRecorrido || 0);
+    cerrarNavegacion();
+    statusMsg.textContent = '🎉 ¡Has llegado a tu destino!';
+    mostrarModalLlegada(destino, metros, precisionGPS || 15);
+    window.tiempoInicioRuta = null;
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+// ---------- D. Detección de llegada mejorada ----------
+const RADIO_LLEGADA_METROS = 25;   // a esta distancia del punto del edificio = llegaste
+const FIN_RUTA_METROS = 12;        // o si te quedan menos de esto sobre la ruta
+
+function vigilarLlegada() {
+    if (watchId === null || !destinoActual || !userLocation) return;
+    const dLinea = distancia(userLocation.lat, userLocation.lng, destinoActual.lat, destinoActual.lng) * 1000;
+    let llegoPorRuta = false;
+    if (window.rutaCoordsActuales) {
+        const info = distanciaRestanteEnRuta(window.rutaCoordsActuales, userLocation.lat, userLocation.lng);
+        if (info && info.distanciaRestanteMetros <= FIN_RUTA_METROS && info.distanciaAlSenderoMetros <= 30) {
+            llegoPorRuta = true;
+        }
+    }
+    if (dLinea <= RADIO_LLEGADA_METROS || llegoPorRuta) {
+        finalizarRuta(destinoActual, 15, dLinea);
+    }
+}
+
+// ---------- E. Botón grande "Terminar ruta" ----------
+const estiloV2 = document.createElement('style');
+estiloV2.textContent =
+    '#btnTerminarRuta{position:absolute;right:10px;top:190px;z-index:10005;display:none;' +
+    'border:none;background:#B23A48;color:#fff;font-weight:700;font-size:1rem;' +
+    'padding:14px 18px;min-height:52px;border-radius:30px;cursor:pointer;' +
+    'box-shadow:0 6px 18px rgba(0,0,0,.35);font-family:var(--font-body);}';
+document.head.appendChild(estiloV2);
+
+const btnTerminarRuta = document.createElement('button');
+btnTerminarRuta.id = 'btnTerminarRuta';
+btnTerminarRuta.textContent = '✖ Terminar ruta';
+btnTerminarRuta.addEventListener('click', function() {
+    if (confirm('¿Quieres terminar la ruta?')) {
+        cerrarNavegacion();
+        window.tiempoInicioRuta = null;
+    }
+});
+document.getElementById('contenedor3D').appendChild(btnTerminarRuta);
+
+// Al cambiar de destino se reinicia el contador de metros
+select.addEventListener('change', function() { metrosCaminados = 0; ultimaPosCaminata = null; });
+
+// Al presionar "Empezar a caminar": pantalla encendida + guardar ruta
+btnIniciarRutaPie.addEventListener('click', function() {
+    mantenerPantallaEncendida();
+    guardarNavegacion();
+});
+
+// ---------- F. Revisión cada segundo ----------
+setInterval(function() {
+    vigilarLlegada();
+
+const enRuta = watchId !== null && !!destinoActual && modoNavegacionActivo;    btnTerminarRuta.style.display = enRuta ? 'block' : 'none';
+
+    if (enRuta && userLocation) {
+        if (ultimaPosCaminata) {
+            const d = distancia(ultimaPosCaminata.lat, ultimaPosCaminata.lng, userLocation.lat, userLocation.lng) * 1000;
+            if (d >= 3 && d < 60) metrosCaminados += d;
+        }
+        ultimaPosCaminata = { lat: userLocation.lat, lng: userLocation.lng };
+    }
+    if (enRuta) {
+        guardarNavegacion();
+        if (!pantallaBloqueo && document.visibilityState === 'visible' &&
+            Date.now() - ultimoIntentoPantalla > 10000) {
+            mantenerPantallaEncendida();
+        }
+    }
+}, 1000);
+// ===============================================================
+// PASO 3: calles tipo Google Maps + etiquetas con el número de módulo
+// (mantiene el estilo Liberty y la inclinación del mapa)
+// ===============================================================
+function mejorarCallesYEtiquetas3D() {
+    try {
+        if (!mapa3D || !mapa3D.getLayer('edificios-3d')) return;
+        if (mapa3D.getLayer('calles-relleno-menor')) return; // ya aplicado
+
+        // ---- Tipografía: reutilizamos la del propio mapa (ya está guardada para uso sin internet) ----
+        const capas = mapa3D.getStyle().layers;
+        let fuenteNormal = null, fuenteNegrita = null;
+        capas.forEach(function(c) {
+            const f = c.layout && c.layout['text-font'];
+            if (!Array.isArray(f) || !f.every(function(x) { return typeof x === 'string'; })) return;
+            if (!fuenteNormal) fuenteNormal = f;
+            if (!fuenteNegrita && f.join(' ').indexOf('Bold') !== -1) fuenteNegrita = f;
+        });
+        fuenteNormal = fuenteNormal || ['Noto Sans Regular'];
+        fuenteNegrita = fuenteNegrita || fuenteNormal;
+
+        // ---- Ocultamos los nombres de calle originales para no duplicarlos ----
+        capas.forEach(function(c) {
+            if (c.type === 'symbol' && c['source-layer'] === 'transportation_name') {
+                mapa3D.setLayoutProperty(c.id, 'visibility', 'none');
+            }
+        });
+
+        // ---- Calles: borde + relleno, se dibujan debajo de los edificios ----
+        const sinTunel = ['!=', ['get', 'brunnel'], 'tunnel'];
+        const esMayor = ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], true, false];
+        const esMenor = ['match', ['get', 'class'], ['secondary', 'tertiary', 'minor', 'service'], true, false];
+        const ancho = function(a, b, c, d) {
+            return ['interpolate', ['exponential', 1.5], ['zoom'], 13, a, 16, b, 18, c, 20, d];
+        };
+        const lineaBase = { 'line-cap': 'round', 'line-join': 'round' };
+
+        mapa3D.addLayer({
+            id: 'calles-borde-menor', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+            minzoom: 13, filter: ['all', sinTunel, esMenor], layout: lineaBase,
+            paint: { 'line-color': '#c3c9d1', 'line-width': ancho(1.2, 6, 16, 38) }
+        }, 'edificios-3d');
+        mapa3D.addLayer({
+            id: 'calles-borde-mayor', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+            minzoom: 12, filter: ['all', sinTunel, esMayor], layout: lineaBase,
+            paint: { 'line-color': '#e0b64a', 'line-width': ancho(2, 8, 20, 44) }
+        }, 'edificios-3d');
+        mapa3D.addLayer({
+            id: 'calles-relleno-menor', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+            minzoom: 13, filter: ['all', sinTunel, esMenor], layout: lineaBase,
+            paint: { 'line-color': '#ffffff', 'line-width': ancho(0.6, 4, 12, 30) }
+        }, 'edificios-3d');
+        mapa3D.addLayer({
+            id: 'calles-relleno-mayor', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+            minzoom: 12, filter: ['all', sinTunel, esMayor], layout: lineaBase,
+            paint: { 'line-color': '#fde293', 'line-width': ancho(1, 6, 16, 36) }
+        }, 'edificios-3d');
+        mapa3D.addLayer({
+            id: 'calles-caminos', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+            minzoom: 15, filter: ['match', ['get', 'class'], ['path', 'track'], true, false],
+            layout: lineaBase,
+            paint: { 'line-color': '#b9a98a', 'line-width': ancho(0.5, 1.5, 3, 6), 'line-dasharray': [2, 1.5] }
+        }, 'edificios-3d');
+
+        // ---- Nombres de calle (más grandes, con halo blanco) ----
+        mapa3D.addLayer({
+            id: 'calles-nombres', type: 'symbol', source: 'openmaptiles', 'source-layer': 'transportation_name',
+            minzoom: 15,
+            layout: {
+                'symbol-placement': 'line',
+                'text-field': ['get', 'name'],
+                'text-font': fuenteNormal,
+                'text-size': ['interpolate', ['linear'], ['zoom'], 15, 11, 18, 14, 20, 17],
+                'text-letter-spacing': 0.03,
+                'text-max-angle': 30
+            },
+            paint: { 'text-color': '#3c4043', 'text-halo-color': '#ffffff', 'text-halo-width': 2 }
+        });
+
+        // ---- Etiquetas con el número de cada módulo ----
+        const features = edificios
+            .filter(function(e) { return e.id !== 1 && e.id !== 6; }) // sin las sedes
+            .map(function(e) {
+                const m = e.nombre.match(/M[oó]dulo\s+(\d+)/i);
+                return {
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+                    properties: {
+                        texto: m ? m[1] : e.nombre.replace(/^↪\s*/, ''),
+                        esModulo: !!m
+                    }
+                };
+            });
+
+        mapa3D.addSource('modulos-etiquetas', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: features }
+        });
+        mapa3D.addLayer({
+            id: 'modulos-etiquetas-texto', type: 'symbol', source: 'modulos-etiquetas',
+            minzoom: 16,
+            layout: {
+                'text-field': ['get', 'texto'],
+                'text-font': fuenteNegrita,
+                'text-size': ['interpolate', ['linear'], ['zoom'],
+                    16, ['case', ['get', 'esModulo'], 11, 9],
+                    18, ['case', ['get', 'esModulo'], 15, 12],
+                    20, ['case', ['get', 'esModulo'], 20, 15]],
+                'text-anchor': 'top',
+                'text-offset': [0, 1.0],
+                'text-max-width': 6,
+                'text-allow-overlap': false,
+                'text-optional': true,
+                'symbol-sort-key': ['case', ['get', 'esModulo'], 0, 1]
+            },
+            paint: {
+                'text-color': ['case', ['get', 'esModulo'], '#0A4A35', '#8C5A34'],
+                'text-halo-color': '#ffffff',
+                'text-halo-width': 2.5
+            }
+        });
+    } catch (e) {
+        console.warn('No se pudo aplicar el paso 3 (calles y etiquetas):', e);
+    }
+}
+
+if (mapa3D) {
+    if (mapa3D.getLayer('edificios-3d')) mejorarCallesYEtiquetas3D();
+    else mapa3D.once('load', mejorarCallesYEtiquetas3D);
+}
+// ===============================================================
+// PASO 4: botones y textos grandes (accesibilidad)
+// Todo el aspecto vive en este bloque: para ajustar tamaños,
+// cambia solo los números de aquí.
+// ===============================================================
+(function() {
+    const css = `
+    /* ---------- Zona de búsqueda ---------- */
+    .search-section { gap: 14px !important; }
+    .search-section label { font-size: 1.2rem !important; }
+    .search-section #targetid {
+        min-height: 64px !important;
+        font-size: 18px !important;
+        border-radius: 16px !important;
+        border-width: 2px !important;
+    }
+    .search-section #btnMiUbicacion {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        min-height: 68px !important;
+        font-size: 1.25rem !important;
+        border-radius: 18px !important;
+        background: var(--oro-escudo) !important;
+        color: var(--verde-oscuro) !important;
+        box-shadow: 0 5px 14px rgba(0,0,0,.22) !important;
+    }
+    .search-section #btnEstadisticas,
+    .search-section #btnEventos,
+    .search-section #btnSubirHorario,
+    #btnGuardarOffline {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        min-height: 60px !important;
+        font-size: 1.1rem !important;
+        padding: 12px 16px !important;
+        border-radius: 16px !important;
+        margin: 0 !important;
+        white-space: normal !important;
+        line-height: 1.25 !important;
+    }
+    #resultadoHorario { font-size: 1rem !important; line-height: 1.6 !important; }
+    #resultadoHorario button {
+        min-height: 44px !important;
+        font-size: .95rem !important;
+        padding: 8px 16px !important;
+        border-radius: 22px !important;
+    }
+
+    /* ---------- Leyenda y panel sin internet ---------- */
+    .leyenda-item { font-size: .9rem !important; }
+    .leyenda-dot { width: 16px !important; height: 16px !important; }
+    .panel-offline .estado-offline { font-size: 1rem !important; line-height: 1.5 !important; }
+
+    /* ---------- Panel de estado y "Empezar a caminar" ---------- */
+    .info-panel { padding: 16px 18px !important; }
+    .info-panel .message { font-size: 1.1rem !important; line-height: 1.45 !important; }
+    .info-panel .btn-google {
+        width: 100% !important;
+        justify-content: center !important;
+        min-height: 68px !important;
+        font-size: 1.25rem !important;
+        border-radius: 18px !important;
+    }
+    .instrucciones-panel h3 { font-size: 1.15rem !important; }
+    .instrucciones-panel li { font-size: 1.05rem !important; line-height: 1.5 !important; }
+    .resumen-ruta { font-size: 1rem !important; }
+
+    /* ---------- Avisos y ventanas ---------- */
+    .aviso-fuera-campus .aviso-texto { font-size: 1.05rem !important; }
+    .aviso-fuera-campus .btn-google-maps {
+        width: 100% !important;
+        justify-content: center !important;
+        min-height: 60px !important;
+        font-size: 1.1rem !important;
+        border-radius: 16px !important;
+    }
+    .toast-cerca { padding: 16px 18px !important; }
+    .toast-cerca .toast-texto { font-size: 1rem !important; line-height: 1.45 !important; }
+    .toast-cerca .toast-icono { font-size: 1.6rem !important; }
+    .btn-cerrar-modal, .btn-cerrar-estadisticas {
+        min-height: 60px !important;
+        font-size: 1.15rem !important;
+        border-radius: 18px !important;
+        width: 100% !important;
+    }
+    .modal-llegada h2 { font-size: 1.7rem !important; }
+    .modal-llegada .modal-destino { font-size: 1.1rem !important; }
+    .modal-llegada-dato .valor { font-size: 1.35rem !important; }
+    .modal-llegada-dato .etiqueta { font-size: .8rem !important; }
+    .ranking-nombre { font-size: 1rem !important; }
+    .ranking-visitas { font-size: 1rem !important; }
+    .ev-btn { min-height: 52px !important; font-size: 1rem !important; border-radius: 14px !important; }
+    .ev-card h4 { font-size: 1.2rem !important; }
+    .ev-meta, .ev-desc { font-size: 1rem !important; }
+    .btn-dark-toggle { width: 54px !important; height: 54px !important; font-size: 1.6rem !important; }
+
+    /* ---------- Mapa 3D ---------- */
+    .pin3d { width: 36px !important; height: 36px !important; font-size: 18px !important; border-width: 3px !important; }
+    .banner-giro-3d { padding: 14px 16px !important; gap: 14px !important; }
+    .banner-giro-3d .icono-giro { font-size: 2.4rem !important; }
+    .banner-giro-3d .texto-giro { font-size: 1.2rem !important; }
+    .banner-giro-3d small { font-size: .95rem !important; }
+    .aviso-3d { font-size: .9rem !important; padding: 10px 14px !important; }
+    .btn-centrar-3d {
+        min-height: 56px !important;
+        font-size: 1.05rem !important;
+        padding: 12px 20px !important;
+        border-radius: 30px !important;
+    }
+    #btnTerminarRuta {
+        min-height: 60px !important;
+        font-size: 1.1rem !important;
+        padding: 14px 22px !important;
+    }
+    .tarjeta-destino-3d { font-size: 1rem !important; line-height: 1.5 !important; }
+    .tarjeta-destino-3d h4 { font-size: 1.15rem !important; }
+    .tarjeta-destino-3d #btnLlevameTarjeta {
+        min-height: 56px !important;
+        font-size: 1.1rem !important;
+        border-radius: 14px !important;
+    }
+    .tarjeta-destino-3d #btnQuitarDestino3D {
+        font-size: 1.5rem !important;
+        width: 44px !important;
+        height: 44px !important;
+        top: 2px !important;
+        right: 2px !important;
+    }
+    .leyenda-3d { font-size: .9rem !important; }
+    .dest3d-label { font-size: .9rem !important; padding: 6px 10px !important; max-width: 190px !important; }
+    .maplibregl-ctrl-group button { width: 48px !important; height: 48px !important; }
+    `;
+    const estilo = document.createElement('style');
+    estilo.id = 'estilos-paso4';
+    estilo.textContent = css;
+    document.head.appendChild(estilo);
+})();
+// ===============================================================
+// PASO 5: mapa a pantalla completa estilo Google Maps
+// Mueve elementos existentes; no cambia la lógica de la ruta.
+// ===============================================================
+(function() {
+    const $ = function(id) { return document.getElementById(id); };
+
+    // ---------- Estilos ----------
+    const css = `
+    html, body { height: 100% !important; overflow: hidden !important; }
+    body { padding: 0 !important; display: block !important; }
+
+    /* El mapa ocupa toda la pantalla */
+    #contenedor3D {
+        position: fixed !important; inset: 0 !important;
+        width: 100% !important; height: 100vh !important; height: 100dvh !important;
+        min-height: 0 !important; border-radius: 0 !important; z-index: 9000 !important;
+    }
+
+    /* La página original pasa a ser un menú que se abre con ☰ */
+    #appContainer {
+        position: fixed !important; left: -200vw; top: 0;
+        width: 100vw !important; max-width: none !important;
+        height: 100vh; height: 100dvh;
+        border-radius: 0 !important; border: none !important;
+        overflow: hidden !important; visibility: hidden; z-index: 9500;
+    }
+    body.menu-abierto #appContainer {
+        left: 0 !important; visibility: visible; overflow-y: auto !important;
+    }
+    #btnVolverMapa {
+        position: sticky; top: 0; z-index: 5; display: block;
+        width: calc(100% - 80px); min-height: 56px; margin: 8px;
+        border: none; border-radius: 16px; background: var(--verde-oscuro);
+        color: #fff; font-weight: 700; font-size: 1.1rem; cursor: pointer;
+        font-family: var(--font-body);
+    }
+    .nota-mapa { margin: 14px 12px 24px; font-size: .78rem; color: #6a7f74; text-align: center; }
+
+    /* Barra superior flotante */
+    #barraSuperior {
+        position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 50%;
+        transform: translateX(-50%); width: calc(100% - 20px); max-width: 560px;
+        z-index: 10005; display: flex; gap: 8px; align-items: center;
+        background: var(--bg-card); border-radius: 34px; padding: 6px;
+        box-shadow: 0 4px 18px rgba(0,0,0,.3);
+    }
+    #btnMenu {
+        flex: 0 0 52px; height: 52px; border: none; border-radius: 50%;
+        background: var(--verde-oscuro); color: #fff; font-size: 1.6rem; cursor: pointer;
+    }
+    #barraSuperior #targetid {
+        flex: 1; min-width: 0; width: auto; height: 52px; border: none; outline: none;
+        background-color: transparent; color: var(--text-main);
+        font-family: var(--font-body); font-size: 1.05rem; font-weight: 600;
+        padding: 0 40px 0 10px; text-overflow: ellipsis;
+        -webkit-appearance: none; appearance: none; cursor: pointer;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A4A35' stroke-width='3' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 12px center; background-size: 18px;
+    }
+
+    /* Hoja inferior */
+    #hojaInferior {
+        position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+        width: 100%; max-width: 560px; max-height: 55%; overflow-y: auto;
+        z-index: 10004; background: var(--bg-card);
+        border-radius: 22px 22px 0 0;
+        padding: 6px 14px calc(12px + env(safe-area-inset-bottom));
+        box-shadow: 0 -6px 24px rgba(0,0,0,.25);
+    }
+    #asaHoja { display: block; width: 100%; height: 26px; border: none; background: none; cursor: pointer; }
+    #asaHoja::before {
+        content: ""; display: block; width: 44px; height: 5px;
+        border-radius: 3px; background: #b8c2bc; margin: 0 auto;
+    }
+    #hojaInferior.minimizada #tarjetaDestino3D,
+    #hojaInferior.minimizada #avisoFueraCampus { display: none !important; }
+
+    #hojaInferior #tarjetaDestino3D {
+        position: relative !important; left: auto !important; bottom: auto !important;
+        transform: none !important; width: 100% !important; max-height: 110px !important;
+        overflow-y: auto; background: transparent !important; box-shadow: none !important;
+        padding: 4px 40px 4px 10px !important; margin-bottom: 8px;
+    }
+    #btnLlevameTarjeta { display: none !important; }
+    #hojaInferior #btnMiUbicacion {
+        display: block; width: 100% !important; min-height: 64px !important;
+        font-size: 1.2rem !important; border-radius: 18px !important;
+        background: var(--oro-escudo) !important; color: var(--verde-oscuro) !important;
+        margin: 0 !important; flex: none !important;
+    }
+    #hojaInferior .info-panel {
+        width: 100% !important; max-width: 100% !important; margin: 8px 0 0 !important;
+    }
+    #hojaInferior .aviso-fuera-campus { margin: 0 0 8px !important; }
+    #hojaInferior #btnTerminarRuta {
+        position: static !important; width: 100%; margin-top: 8px;
+    }
+
+    /* Elementos flotantes del mapa, reubicados bajo la barra */
+    .panel-guia-3d { top: calc(84px + env(safe-area-inset-top)) !important; z-index: 10004 !important; }
+    .leyenda-3d { top: 190px !important; left: 8px !important; }
+    #btnCentrar3D { top: 190px !important; bottom: auto !important; right: 10px !important; }
+    .aviso-3d { display: none !important; }
+    .maplibregl-ctrl-top-right { display: none !important; }
+    `;
+    const estilo = document.createElement('style');
+    estilo.id = 'estilos-paso5';
+    estilo.textContent = css;
+    document.head.appendChild(estilo);
+
+    // ---------- Mover el mapa fuera de la página ----------
+    const mapaCont = $('contenedor3D');
+    document.body.appendChild(mapaCont);
+
+    // ---------- Barra superior: ☰ + lista de destinos ----------
+    const barra = document.createElement('div');
+    barra.id = 'barraSuperior';
+    const btnMenu = document.createElement('button');
+    btnMenu.id = 'btnMenu';
+    btnMenu.setAttribute('aria-label', 'Abrir menú');
+    btnMenu.textContent = '☰';
+    barra.appendChild(btnMenu);
+    barra.appendChild($('targetid'));
+    mapaCont.appendChild(barra);
+
+    // ---------- Hoja inferior ----------
+    const hoja = document.createElement('div');
+    hoja.id = 'hojaInferior';
+    const asa = document.createElement('button');
+    asa.id = 'asaHoja';
+    asa.setAttribute('aria-label', 'Minimizar o expandir');
+    hoja.appendChild(asa);
+    hoja.appendChild($('avisoFueraCampus'));
+    hoja.appendChild($('tarjetaDestino3D'));
+    hoja.appendChild($('btnMiUbicacion'));
+    hoja.appendChild($('infoPanel'));
+    hoja.appendChild($('btnTerminarRuta'));
+    mapaCont.appendChild(hoja);
+    asa.addEventListener('click', function() { hoja.classList.toggle('minimizada'); });
+
+    // ---------- Menú ☰ (la página original) ----------
+    const cont = $('appContainer');
+    const btnVolver = document.createElement('button');
+    btnVolver.id = 'btnVolverMapa';
+    btnVolver.textContent = '✖ Volver al mapa';
+    cont.insertBefore(btnVolver, cont.firstChild);
+    cont.appendChild($('btnDarkToggle')); // el modo oscuro vive en el menú
+
+    const nota = document.createElement('p');
+    nota.className = 'nota-mapa';
+    nota.textContent = 'Mapa © contribuidores de OpenStreetMap · OpenFreeMap · MapLibre';
+    cont.appendChild(nota);
+
+    function ajustarMapa() {
+        setTimeout(function() { if (mapa3D) mapa3D.resize(); }, 300);
+    }
+    function abrirMenu() { document.body.classList.add('menu-abierto'); }
+    function cerrarMenu() { document.body.classList.remove('menu-abierto'); ajustarMapa(); }
+    btnMenu.addEventListener('click', abrirMenu);
+    btnVolver.addEventListener('click', cerrarMenu);
+
+    // "Ir al mapa" del horario: cierra el menú antes de ir
+    const irOriginal = window.irAEdificio;
+    window.irAEdificio = function(id) { cerrarMenu(); irOriginal(id); };
+
+    ajustarMapa();
+    window.addEventListener('resize', ajustarMapa);
+})();
 </script>
 
 </body>
