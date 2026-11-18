@@ -1519,6 +1519,130 @@ html { -webkit-text-size-adjust: 100%; }
     .panel-offline .btn-geo { width: 100%; min-height: 48px; }
     .banner-offline { font-size: .78rem; }
 }
+/* ===== ROLES: ADMINISTRADOR / VISITANTE ===== */
+body:not(.rol-admin) .solo-admin { display: none !important; }
+
+.portada-botones { display:flex; flex-direction:column; gap:14px; width:min(340px,86vw); margin-top:14px; }
+.portada-botones button {
+    width:100%; min-height:66px; margin:0 !important; border-radius:40px;
+    font-size:1.2rem; font-weight:700; font-family:var(--font-body); cursor:pointer;
+}
+#btnPortadaAdmin { border:3px solid var(--oro-escudo); background:transparent; color:#fff; }
+#btnPortadaAdmin:hover { background:rgba(255,255,255,.14); }
+
+.modal-login-overlay {
+    position:fixed; inset:0; z-index:10050; background:rgba(10,30,20,.72);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.modal-login-overlay.hidden { display:none; }
+.modal-login {
+    background:#fff; color:#1C2620; width:100%; max-width:400px; border-radius:22px;
+    padding:26px 22px 22px; border-top:6px solid var(--oro-escudo); box-shadow:0 30px 80px rgba(0,0,0,.4);
+}
+.modal-login h2 { font-family:var(--font-display); font-size:1.5rem; color:#0A4A35; margin-bottom:4px; }
+.login-sub { font-size:1rem; color:#5a6b62; margin-bottom:14px; }
+.modal-login input {
+    width:100%; min-height:58px; font-size:1.1rem; padding:0 14px; margin-bottom:12px;
+    border:2px solid #cfd8d3; border-radius:14px; font-family:var(--font-body); background:#fff; color:#1C2620;
+}
+.modal-login input:focus { outline:none; border-color:var(--oro-escudo); }
+.fila-clave { position:relative; }
+.fila-clave input { padding-right:56px; }
+#btnVerClave { position:absolute; right:6px; top:6px; width:46px; height:46px; border:none; background:none; font-size:1.4rem; cursor:pointer; }
+.login-msg { min-height:1.3em; font-size:1rem; font-weight:600; color:#B23A48; margin-bottom:8px; }
+.btn-rol {
+    display:block; width:100%; min-height:60px; margin-top:10px; border:none; border-radius:16px;
+    font-size:1.15rem; font-weight:700; cursor:pointer; font-family:var(--font-body);
+}
+.btn-rol-si { background:var(--verde-bandera); color:#fff; }
+.btn-rol-no { background:#e8e8e8; color:#333; }
+.btn-rol:disabled { opacity:.6; }
+
+/* Panel de administrador dentro del menú ☰ */
+#cabeceraAdmin { flex:0 0 100%; background:var(--verde-oscuro); color:#fff; border-radius:16px; padding:14px 16px; font-size:1.1rem; line-height:1.4; }
+#cabeceraAdmin span { display:block; font-size:.85rem; font-weight:400; opacity:.85; word-break:break-all; }
+#btnAdminEventos {
+    position:static !important; left:auto !important; bottom:auto !important;
+    flex:0 0 100% !important; width:100% !important; min-height:60px; margin:0 !important;
+    font-size:1.1rem; border-radius:16px; background:#1B3B5F; box-shadow:none;
+}
+#btnSalirModo {
+    display:block; width:calc(100% - 24px); min-height:60px; margin:16px 12px 8px; border:none; border-radius:16px;
+    background:#B23A48; color:#fff; font-size:1.1rem; font-weight:700; cursor:pointer; font-family:var(--font-body);
+}
+
+/* Botones grandes Eventos / Admisión (hoja inferior del mapa) */
+#filaAccesos { display:flex; gap:10px; margin:0 0 10px; }
+#filaAccesos button {
+    flex:1; min-height:64px; border:none; border-radius:16px; font-size:1.05rem; font-weight:700;
+    line-height:1.2; cursor:pointer; font-family:var(--font-body);
+}
+#btnAccesoEventos { background:#B23A48; color:#fff; }
+#btnAccesoAdmision { background:var(--oro-escudo); color:var(--verde-oscuro); }
+
+/* Contenido de Admisión */
+.adm-bloque { background:var(--bg-panel); border-radius:14px; padding:12px 14px; margin:10px 0; font-size:1.02rem; line-height:1.5; }
+.adm-bloque h3 { font-family:var(--font-display); font-size:1.1rem; margin-bottom:4px; color:var(--text-heading); }
+.adm-bloque ul { padding-left:20px; }
+.adm-bloque a { color:var(--cielo); font-weight:600; word-break:break-all; }
+.btn-adm-ir {
+    display:block; width:100%; min-height:56px; margin-top:10px; border:none; border-radius:14px;
+    background:var(--verde-bandera); color:#fff; font-weight:700; font-size:1.05rem; cursor:pointer; font-family:var(--font-body);
+}
+
+/* Tarjetas de eventos */
+.ev-acciones .ev-grande { flex:1 1 100%; min-height:58px; font-size:1.05rem; }
+
+/* ===== LÁMPARA (punto azul + haz de luz) ===== */
+.guia-flecha-rot { display:none !important; }   /* se oculta la flecha vieja */
+.lampara-punto {
+    width:22px; height:22px; border-radius:50%; background:#4285F4; border:3px solid #fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.15), 0 2px 8px rgba(0,0,0,.45); pointer-events:none;
+}
+.lampara-punto.cerca { background:#22C55E; }
+.lampara-haz {
+    --c:66,133,244; width:170px; height:170px; border-radius:50%; pointer-events:none;
+    background:conic-gradient(from -34deg at 50% 50%, rgba(var(--c),.75) 0deg 68deg, transparent 68deg 360deg);
+    -webkit-mask-image:radial-gradient(circle at 50% 50%, #000 8%, transparent 70%);
+    mask-image:radial-gradient(circle at 50% 50%, #000 8%, transparent 70%);
+}
+.lampara-haz.cerca { --c:34,197,94; }
+/* ===== ADMISIÓN: lista de requisitos ===== */
+.adm-oculto { display: none !important; }
+.adm-bloque p { margin: 4px 0 6px; }
+.adm-enlace { font-size: .8rem; word-break: break-all; opacity: .75; }
+a.btn-adm-ir { text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
+
+.adm-progreso { margin: 8px 0 4px; }
+.adm-progreso-barra { height: 12px; background: rgba(11,110,79,.15); border-radius: 8px; overflow: hidden; }
+#admBarra { height: 100%; width: 0; background: var(--verde-bandera); transition: width .3s; }
+#admProgresoTxt { display: block; margin-top: 4px; font-size: .9rem; font-weight: 600; color: var(--text-heading); }
+
+.adm-item {
+    display: flex; align-items: flex-start; gap: 12px; padding: 12px;
+    margin-top: 8px; background: var(--bg-card); border: 2px solid var(--border-soft);
+    border-radius: 12px; cursor: pointer; font-size: 1rem; line-height: 1.4;
+}
+.adm-item input { width: 26px; height: 26px; flex: 0 0 26px; margin-top: 1px; accent-color: #0B6E4F; }
+.adm-item.hecho { border-color: var(--verde-bandera); background: var(--verde-suave); }
+.adm-item.hecho span { text-decoration: line-through; opacity: .7; }
+
+.adm-pregunta { margin: 10px 0; padding: 12px; background: #fff3cd; color: #5c4a14; border: 2px solid var(--oro-escudo); border-radius: 12px; }
+.adm-pregunta-botones { display: flex; gap: 8px; margin-top: 8px; }
+.adm-pregunta-botones button {
+    flex: 1; min-height: 52px; border: none; border-radius: 12px; font-weight: 700;
+    font-size: 1rem; cursor: pointer; font-family: var(--font-body);
+}
+#admFormSi { background: var(--verde-bandera); color: #fff; }
+#admFormNo { background: #e8e8e8; color: #333; }
+
+.adm-felicidades { border: 3px solid var(--verde-bandera); }
+.adm-principal { background: var(--oro-escudo) !important; color: var(--verde-oscuro) !important; }
+.btn-adm-reiniciar {
+    display: block; width: 100%; margin-top: 10px; padding: 12px; background: none;
+    border: 2px dashed var(--border-soft); border-radius: 12px; color: var(--text-main);
+    cursor: pointer; font-family: var(--font-body); font-size: .95rem;
+}
 </style>
 </head>
 <body>
@@ -1536,7 +1660,10 @@ html { -webkit-text-size-adjust: 100%; }
         <div class="portada-eyebrow">Universidad Autónoma Gabriel René Moreno</div>
         <h1 class="portada-titulo">Mapa Inteligente <span class="accent">UAGRM</span></h1>
         <p class="portada-sub">Sistema de geolocalización y rutas dentro del campus universitario, con identidad cruceña</p>
-        <button class="btn-ingresar" id="btnIngresar">Ingresar al mapa ➜</button>
+        <div class="portada-botones">
+    <button class="btn-ingresar" id="btnIngresar">👤 Entrar como visitante</button>
+    <button id="btnPortadaAdmin">🔐 Administrador</button>
+</div>
     </div>
     <div class="portada-franja portada-franja-abajo"><span></span><span></span><span></span></div>
 </div>
@@ -1762,7 +1889,85 @@ html { -webkit-text-size-adjust: 100%; }
         <button class="btn-cerrar-estadisticas" id="btnCerrarAdmin">Cerrar</button>
     </div>
 </div>
+<!-- ===== Login de administrador ===== -->
+<div class="modal-login-overlay hidden" id="modalLoginAdmin">
+    <div class="modal-login">
+        <h2>🔐 Administrador</h2>
+        <p class="login-sub">Escribe tu correo y tu contraseña.</p>
+        <input type="email" id="loginCorreo" placeholder="Correo" autocomplete="username">
+        <div class="fila-clave">
+            <input type="password" id="loginClave" placeholder="Contraseña" autocomplete="current-password">
+            <button type="button" id="btnVerClave" aria-label="Mostrar contraseña">👁</button>
+        </div>
+        <p id="loginMsg" class="login-msg"></p>
+        <button class="btn-rol btn-rol-si" id="btnLoginEntrar">Entrar</button>
+        <button class="btn-rol btn-rol-no" id="btnLoginCancelar">Cancelar</button>
+    </div>
+</div>
 
+<!-- ===== Admisión FCEE (nuevos bachilleres) ===== -->
+<div class="modal-estadisticas-overlay hidden" id="modalAdmisionOverlay" style="z-index:10040;">
+    <div class="modal-estadisticas">
+        <h2>🎓 Admisión FCEE</h2>
+        <p class="modal-sub">Para estudiantes de colegio recién egresados (promoción).</p>
+
+        <!-- Avance -->
+        <div class="adm-progreso">
+            <div class="adm-progreso-barra"><div id="admBarra"></div></div>
+            <span id="admProgresoTxt">0 de 5 requisitos listos</span>
+        </div>
+
+        <!-- 1. Formulario -->
+        <div class="adm-bloque">
+            <h3>1️⃣ Formulario de registro de datos</h3>
+            <p>Llénalo en línea. Se abre en otra pestaña; cuando termines, vuelve aquí.</p>
+            <a class="btn-adm-ir" id="admAbrirForm" href="https://forms.gle/HJhz7xPpH6mXH5bW8" target="_blank" rel="noopener">📝 Abrir el formulario</a>
+            <p class="adm-enlace">https://forms.gle/HJhz7xPpH6mXH5bW8</p>
+
+            <div class="adm-pregunta adm-oculto" id="admPreguntaForm">
+                <b>¿Ya enviaste el formulario?</b>
+                <div class="adm-pregunta-botones">
+                    <button type="button" id="admFormSi">✅ Sí, ya lo envié</button>
+                    <button type="button" id="admFormNo">Todavía no</button>
+                </div>
+            </div>
+
+            <label class="adm-item">
+                <input type="checkbox" data-adm-check="form">
+                <span>Ya llené y envié el formulario</span>
+            </label>
+        </div>
+
+        <!-- 2. Pago -->
+        <div class="adm-bloque">
+            <h3>2️⃣ Pago de matrícula</h3>
+            <p>En las ventanillas de la FCEE-UAGRM, <b>módulo 244, planta baja</b>.</p>
+            <button class="btn-adm-ir" data-adm-ir="35">📍 Llevarme al módulo 244</button>
+        </div>
+
+        <!-- 3. Requisitos -->
+        <div class="adm-bloque">
+            <h3>3️⃣ Tus 5 requisitos</h3>
+            <p>Marca lo que ya tienes. Los documentos se <b>revisan en el módulo 244</b>.</p>
+            <label class="adm-item"><input type="checkbox" data-adm-check="titulo"><span>Título de bachiller (original y copia)</span></label>
+            <label class="adm-item"><input type="checkbox" data-adm-check="libreta"><span>Libreta o certificado de notas del último año de secundaria (original y fotocopia)</span></label>
+            <label class="adm-item"><input type="checkbox" data-adm-check="cedula"><span>Cédula de identidad vigente (original y fotocopia)</span></label>
+            <label class="adm-item"><input type="checkbox" data-adm-check="recibo"><span>Recibo original del pago de PSA/CUP</span></label>
+            <label class="adm-item"><input type="checkbox" data-adm-check="copia"><span>Copia del formulario de pre-inscripción <small>(se marca sola al enviar el formulario; recuerda llevar tu copia)</small></span></label>
+        </div>
+
+        <!-- 4. Felicidades (aparece al completar los 5) -->
+        <div class="adm-bloque adm-felicidades adm-oculto" id="admFelicidades">
+            <h3>🎉 ¡Felicidades! Ya completaste tus requisitos</h3>
+            <p>Siguiente paso: que revisen tus documentos en el <b>módulo 244</b> y luego déjalos en el <b>Pabellón 145</b>.</p>
+            <button class="btn-adm-ir" data-adm-ir="35">📍 Revisión: módulo 244</button>
+            <button class="btn-adm-ir adm-principal" data-adm-ir="7">📍 Entregar en el Pabellón 145</button>
+        </div>
+
+        <button class="btn-adm-reiniciar" id="admReiniciar" type="button">↺ Reiniciar mi lista</button>
+        <button class="btn-cerrar-estadisticas" id="btnCerrarAdmision">Cerrar</button>
+    </div>
+</div>
 <!-- Scripts Leaflet y plugins -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
@@ -4067,7 +4272,6 @@ async function guardarEvento() {
 }
 
 function iniciarAdmin() {
-    if (new URLSearchParams(location.search).get('admin') !== 'true') return;
     byId('btnAdminEventos').classList.remove('ev-hidden');
 
     const sel = byId('evModulo');
@@ -5835,6 +6039,382 @@ if (mapa3D) {
     }
 
     setInterval(actualizar, 70);
+})();
+// ===============================================================
+// A) ROLES: ADMINISTRADOR (con login) / VISITANTE + ADMISIÓN
+// ===============================================================
+(function() {
+    const $ = function(id) { return document.getElementById(id); };
+
+    // Solo el administrador ve estos botones. El visitante ve Eventos,
+    // Subir horario (PDF) y Admisión.
+    const SOLO_ADMIN = ['btnEstadisticas', 'btnAdminEventos'];
+    document.body.classList.add('rol-visitante');
+    SOLO_ADMIN.forEach(function(id) { const el = $(id); if (el) el.classList.add('solo-admin'); });
+
+    // Cabecera del panel de administrador (en el menú ☰)
+    const cab = document.createElement('div');
+    cab.id = 'cabeceraAdmin';
+    cab.className = 'solo-admin';
+    cab.innerHTML = '<b>🔐 Panel de administrador</b><span id="correoAdmin"></span>';
+    $('btnEstadisticas').parentNode.insertBefore(cab, $('btnEstadisticas'));
+    $('btnEventos').insertAdjacentElement('afterend', $('btnAdminEventos'));
+
+    // Botón "Salir" al final del menú ☰
+    const btnSalir = document.createElement('button');
+    btnSalir.id = 'btnSalirModo';
+    btnSalir.textContent = '🚪 Salir y volver al inicio';
+    $('appContainer').appendChild(btnSalir);
+    btnSalir.addEventListener('click', async function() {
+        try { await _supabase.auth.signOut(); } catch (e) {}
+        location.reload();
+    });
+
+    // Botones grandes Eventos y Admisión (hoja inferior del mapa)
+    const fila = document.createElement('div');
+    fila.id = 'filaAccesos';
+    fila.innerHTML = '<button id="btnAccesoEventos">🎉<br>Eventos</button><button id="btnAccesoAdmision">🎓<br>Admisión</button>';
+    const hoja = $('hojaInferior');
+    if (hoja && $('btnMiUbicacion')) hoja.insertBefore(fila, $('btnMiUbicacion'));
+    else $('contenedor3D').appendChild(fila);
+
+    $('btnAccesoEventos').addEventListener('click', function() { $('btnEventos').click(); });
+    $('btnAccesoAdmision').addEventListener('click', function() { $('modalAdmisionOverlay').classList.remove('hidden'); });
+    $('btnCerrarAdmision').addEventListener('click', function() { $('modalAdmisionOverlay').classList.add('hidden'); });
+    $('modalAdmisionOverlay').addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+    document.querySelectorAll('[data-adm-ir]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            $('modalAdmisionOverlay').classList.add('hidden');
+            window.irAEdificio(Number(b.getAttribute('data-adm-ir')));
+            mostrarToastCerca('📍 Destino fijado. Toca "Llévame al destino" para que te guíe.');
+            enviarEventoGA4('admision_ir', { event_category: 'Admision', event_label: b.getAttribute('data-adm-ir') });
+        });
+    });
+
+    // Mientras camina, se ocultan los dos botones grandes
+    setInterval(function() {
+        fila.style.display = modoNavegacionActivo ? 'none' : 'flex';
+    }, 800);
+
+    // ---------- Rol ----------
+    function aplicarRol(rol, correo) {
+        document.body.classList.remove('rol-admin', 'rol-visitante');
+        document.body.classList.add(rol === 'admin' ? 'rol-admin' : 'rol-visitante');
+        $('correoAdmin').textContent = correo || '';
+    }
+    $('btnIngresar').addEventListener('click', function() { aplicarRol('visitante'); });
+
+    function entrarComoAdmin(correo) {
+        $('btnIngresar').click();      // cierra la portada igual que siempre
+        aplicarRol('admin', correo);   // y después se marca como administrador
+    }
+
+    // ---------- Login ----------
+    const modalLogin = $('modalLoginAdmin');
+    const msgLogin = function(t) { $('loginMsg').textContent = t || ''; };
+
+    $('btnPortadaAdmin').addEventListener('click', async function() {
+        try {
+            const s = await _supabase.auth.getSession();
+            if (s.data && s.data.session) { entrarComoAdmin(s.data.session.user.email); return; }
+        } catch (e) {}
+        msgLogin('');
+        modalLogin.classList.remove('hidden');
+        setTimeout(function() { $('loginCorreo').focus(); }, 100);
+    });
+    $('btnLoginCancelar').addEventListener('click', function() { modalLogin.classList.add('hidden'); });
+    $('btnVerClave').addEventListener('click', function() {
+        const c = $('loginClave');
+        c.type = c.type === 'password' ? 'text' : 'password';
+    });
+
+    async function hacerLogin() {
+        const correo = $('loginCorreo').value.trim();
+        const clave = $('loginClave').value;
+        if (!correo || !clave) { msgLogin('Escribe tu correo y tu contraseña.'); return; }
+        if (!navigator.onLine) { msgLogin('Necesitas internet para entrar como administrador.'); return; }
+        const btn = $('btnLoginEntrar');
+        btn.disabled = true;
+        msgLogin('Entrando…');
+        let r;
+        try { r = await _supabase.auth.signInWithPassword({ email: correo, password: clave }); }
+        catch (e) { r = { error: e }; }
+        btn.disabled = false;
+        if (r.error || !r.data || !r.data.user) { msgLogin('❌ Correo o contraseña incorrectos.'); return; }
+        $('loginClave').value = '';
+        msgLogin('');
+        modalLogin.classList.add('hidden');
+        entrarComoAdmin(r.data.user.email);
+    }
+    $('btnLoginEntrar').addEventListener('click', hacerLogin);
+    ['loginCorreo', 'loginClave'].forEach(function(id) {
+        $(id).addEventListener('keydown', function(e) { if (e.key === 'Enter') hacerLogin(); });
+    });
+})();
+
+// ===============================================================
+// B) EVENTOS: tarjeta con facultad + "Llévame allí" automático
+// ===============================================================
+
+// Esta versión REEMPLAZA a la anterior (JavaScript usa la última que encuentra)
+function renderEventosPublicos() {
+    const cont = byId('listaEventosPublicos');
+    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
+    if (!lista.length) {
+        cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
+        return;
+    }
+    cont.innerHTML = lista.map(function(ev) {
+        const ed = edificios.find(function(e) { return e.id === Number(ev.modulo_id); });
+        const fac = ed ? facultadDe(ed.nombre) : null;
+        const nombreFac = (fac && FACULTADES[fac]) ? FACULTADES[fac].nombre : '';
+        return '<div class="ev-card">' +
+            (ev.imagen_url ? '<img src="' + esc(ev.imagen_url) + '" alt="' + esc(ev.titulo) + '" loading="lazy">' : '') +
+            '<div class="ev-card-body">' +
+                '<h4>' + esc(ev.titulo) + '</h4>' +
+                '<div class="ev-meta">' +
+                    (nombreFac ? '🎓 ' + esc(nombreFac) + '<br>' : '') +
+                    '📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) +
+                '</div>' +
+                (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
+                '<div class="ev-acciones">' +
+                    '<button class="ev-btn ev-grande" data-ev-ir="' + esc(String(ev.modulo_id)) + '">🧭 Llévame allí</button>' +
+                    '<button class="ev-btn ev-gm ev-grande" data-ev-gm="' + esc(String(ev.id)) + '">🗺️ Abrir en Google Maps</button>' +
+                '</div>' +
+            '</div></div>';
+    }).join('');
+}
+
+// Al tocar "Llévame allí": el código de antes elige el módulo; este agrega
+// que pida el GPS, calcule la ruta y empiece a caminar sin más toques.
+byId('listaEventosPublicos').addEventListener('click', function(e) {
+    if (!e.target.closest('[data-ev-ir]')) return;
+    setTimeout(function() {
+        mostrarToastCerca('🧭 Preparando tu ruta desde donde estás…');
+        if (!userLocation) document.getElementById('btnMiUbicacion').click();
+        let intentos = 0;
+        const espera = setInterval(function() {
+            intentos++;
+            const btn = document.getElementById('btnIniciarRutaPie');
+            if (btn && !btn.classList.contains('hidden')) { clearInterval(espera); btn.click(); }
+            else if (intentos > 16) clearInterval(espera);
+        }, 500);
+    }, 700);
+});
+
+// Panel del administrador: la lista de módulos agrupada por facultad
+(function() {
+    const sel = byId('evModulo');
+    if (!sel) return;
+    const grupos = {};
+    edificios.slice().sort(function(a, b) { return a.nombre.localeCompare(b.nombre); }).forEach(function(ed) {
+        const f = facultadDe(ed.nombre);
+        const clave = (f && FACULTADES[f]) ? FACULTADES[f].nombre : 'Otros lugares';
+        (grupos[clave] = grupos[clave] || []).push(ed);
+    });
+    sel.innerHTML = '<option value="">-- ¿En qué módulo es el evento? --</option>';
+    Object.keys(grupos).sort().forEach(function(nombre) {
+        const og = document.createElement('optgroup');
+        og.label = nombre;
+        grupos[nombre].forEach(function(ed) {
+            const o = document.createElement('option');
+            o.value = ed.id;
+            o.textContent = nombreCorto(ed.nombre);
+            og.appendChild(o);
+        });
+        sel.appendChild(og);
+    });
+})();
+
+// ===============================================================
+// C) LÁMPARA: punto azul con haz de luz hacia donde mira el celular
+// ===============================================================
+
+// CALIBRACIÓN: si tu haz apunta unos grados distinto a Google Maps,
+// escribe aquí la diferencia (ej.: -10 si se pasa 10° a la derecha).
+const AJUSTE_BRUJULA_GRADOS = 0;
+
+let rumboBrujula = null;      // hacia dónde mira el celular (0 = norte)
+let rumboGPS = null;          // dirección al caminar (respaldo)
+let tiempoRumboGPS = 0;
+let lamparaPunto = null, lamparaHaz = null;
+let brujulaPedida = false;
+let _hx = 0, _hy = 0, _hayRumbo = false;
+
+// Fórmula estándar del W3C para sacar el rumbo con el celular en cualquier posición
+function calcularRumboSensores(alpha, beta, gamma) {
+    const r = Math.PI / 180;
+    const cA = Math.cos(alpha * r), sA = Math.sin(alpha * r);
+    const sB = Math.sin(beta * r);
+    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r);
+    const Vx = -cA * sG - sA * sB * cG;
+    const Vy = -sA * sG + cA * sB * cG;
+    if (!Vx && !Vy) return null;
+    let h = Math.atan(Vx / Vy);
+    if (Vy < 0) h += Math.PI; else if (Vx < 0) h += 2 * Math.PI;
+    return h * 180 / Math.PI;
+}
+
+function procesarOrientacion(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+        h = e.webkitCompassHeading;                                    // iPhone
+    } else if (e.alpha != null && (e.absolute === true || e.type === 'deviceorientationabsolute')) {
+        h = calcularRumboSensores(e.alpha, e.beta || 0, e.gamma || 0); // Android
+    }
+    if (h === null) return;
+    h = (h + AJUSTE_BRUJULA_GRADOS + 360) % 360;
+    const rad = h * Math.PI / 180;                                     // suavizado para que no tiemble
+    if (!_hayRumbo) { _hx = Math.sin(rad); _hy = Math.cos(rad); _hayRumbo = true; }
+    else { _hx = _hx * 0.75 + Math.sin(rad) * 0.25; _hy = _hy * 0.75 + Math.cos(rad) * 0.25; }
+    rumboBrujula = (Math.atan2(_hx, _hy) * 180 / Math.PI + 360) % 360;
+}
+
+function iniciarBrujula() {
+    if (brujulaPedida || !window.DeviceOrientationEvent) return;
+    brujulaPedida = true;
+    const arrancar = function() {
+        window.addEventListener('deviceorientationabsolute', procesarOrientacion, true);
+        window.addEventListener('deviceorientation', procesarOrientacion, true);
+    };
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {   // iPhone: pide permiso
+        DeviceOrientationEvent.requestPermission().then(function(r) {
+            if (r === 'granted') arrancar();
+            else mostrarToastCerca('🧭 Para ver hacia dónde miras, permite "Movimiento y orientación".');
+        }).catch(function() {});
+    } else {
+        arrancar();
+    }
+}
+// iPhone exige que el permiso se pida desde un toque del usuario
+document.addEventListener('click', iniciarBrujula, true);
+
+// Respaldo: la dirección del GPS cuando la persona camina
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(function(p) {
+        const c = p.coords;
+        if (typeof c.heading === 'number' && !isNaN(c.heading) && c.speed != null && c.speed > 0.8) {
+            rumboGPS = c.heading; tiempoRumboGPS = Date.now();
+        } else if (Date.now() - tiempoRumboGPS > 6000) {
+            rumboGPS = null;
+        }
+    }, function() {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+}
+
+function rumboParaLampara() {
+    if (rumboBrujula !== null) return rumboBrujula;
+    if (rumboGPS !== null) return rumboGPS;
+    if (modoNavegacionActivo && GUIA.coords && typeof rumbo3DActual === 'number') return rumbo3DActual;
+    return null;
+}
+
+function crearLampara() {
+    if (lamparaPunto || !mapa3D) return;
+    const elHaz = document.createElement('div');
+    elHaz.className = 'lampara-haz';
+    const elPunto = document.createElement('div');
+    elPunto.className = 'lampara-punto';
+    // El haz se "acuesta" sobre el mapa y gira con él; el punto siempre se ve redondo
+    lamparaHaz = new maplibregl.Marker({ element: elHaz, rotationAlignment: 'map', pitchAlignment: 'map' })
+        .setLngLat([-63.1945, -17.7765]).addTo(mapa3D);
+    lamparaPunto = new maplibregl.Marker({ element: elPunto })
+        .setLngLat([-63.1945, -17.7765]).addTo(mapa3D);
+    elHaz.style.display = 'none';
+    elPunto.style.display = 'none';
+}
+
+setInterval(function() {
+    if (!mapa3D) return;
+    crearLampara();
+    if (flecha3D) flecha3D.getElement().style.pointerEvents = 'none';   // la flecha vieja ya no estorba
+    if (!userLocation || !lamparaPunto) return;
+
+    const pos = [userLocation.lng, userLocation.lat];
+    lamparaPunto.setLngLat(pos);
+    lamparaHaz.setLngLat(pos);
+    const elPunto = lamparaPunto.getElement(), elHaz = lamparaHaz.getElement();
+    elPunto.style.display = '';
+
+    const r = rumboParaLampara();
+    if (r === null) { elHaz.style.display = 'none'; }
+    else { elHaz.style.display = ''; lamparaHaz.setRotation(r); }
+
+    const cerca = GUIA.cerca === true;     // verde cuando estás a menos de 100 m
+    elPunto.classList.toggle('cerca', cerca);
+    elHaz.classList.toggle('cerca', cerca);
+}, 120);
+// ===============================================================
+// ADMISIÓN: lista de requisitos con casillas y mensaje final
+// ===============================================================
+(function() {
+    const CLAVE = 'uagrm_adm_check';
+    const REQUISITOS = ['titulo', 'libreta', 'cedula', 'recibo', 'copia'];
+    const $ = function(id) { return document.getElementById(id); };
+
+    let estado = {};
+    try { estado = JSON.parse(localStorage.getItem(CLAVE) || '{}'); } catch (e) {}
+
+    const cajas = document.querySelectorAll('[data-adm-check]');
+    let esperandoForm = false;
+
+    function guardar() {
+        try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) {}
+    }
+
+    function pintar() {
+        cajas.forEach(function(c) {
+            const marcada = !!estado[c.getAttribute('data-adm-check')];
+            c.checked = marcada;
+            c.closest('.adm-item').classList.toggle('hecho', marcada);
+        });
+        const hechos = REQUISITOS.filter(function(k) { return estado[k]; }).length;
+        $('admBarra').style.width = (hechos / REQUISITOS.length * 100) + '%';
+        $('admProgresoTxt').textContent = hechos + ' de ' + REQUISITOS.length + ' requisitos listos';
+        $('admFelicidades').classList.toggle('adm-oculto', hechos < REQUISITOS.length);
+    }
+
+    // Marcar / desmarcar a mano
+    cajas.forEach(function(c) {
+        c.addEventListener('change', function() {
+            const clave = c.getAttribute('data-adm-check');
+            estado[clave] = c.checked;
+            if (clave === 'form' && c.checked) estado.copia = true; // el formulario completa la copia
+            guardar();
+            pintar();
+        });
+    });
+
+    // Al tocar "Abrir el formulario": recordamos que se fue a llenarlo
+    $('admAbrirForm').addEventListener('click', function() { esperandoForm = true; });
+
+    // Al volver a la página, preguntamos si ya lo envió
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && esperandoForm) {
+            esperandoForm = false;
+            $('admPreguntaForm').classList.remove('adm-oculto');
+        }
+    });
+
+    $('admFormSi').addEventListener('click', function() {
+        estado.form = true;
+        estado.copia = true;
+        guardar();
+        pintar();
+        $('admPreguntaForm').classList.add('adm-oculto');
+        mostrarToastCerca('✅ Formulario marcado. Sigue con tus documentos.');
+    });
+    $('admFormNo').addEventListener('click', function() {
+        $('admPreguntaForm').classList.add('adm-oculto');
+    });
+
+    $('admReiniciar').addEventListener('click', function() {
+        if (!confirm('¿Borrar tu lista y empezar de nuevo?')) return;
+        estado = {};
+        guardar();
+        pintar();
+    });
+
+    pintar();
 })();
 </script>
 
