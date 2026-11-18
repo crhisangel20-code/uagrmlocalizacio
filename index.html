@@ -1644,6 +1644,24 @@ a.btn-adm-ir { text-align: center; text-decoration: none; display: flex; align-i
     border: 2px dashed var(--border-soft); border-radius: 12px; color: var(--text-main);
     cursor: pointer; font-family: var(--font-body); font-size: .95rem;
 }
+/* ===== ROLES ===== */
+body:not(.rol-maestro) .solo-maestro { display:none !important; }
+body.rol-admin .solo-visitante { display:none !important; }
+#btnMiCuenta, #btnAdministradores {
+    flex:0 0 100% !important; width:100% !important; min-height:60px; margin:0 !important;
+    font-size:1.1rem; border-radius:16px; background:#1B3B5F;
+}
+.adm-usuario { background:var(--bg-card); border:2px solid var(--border-soft); border-radius:12px; padding:10px 12px; margin-top:8px; word-break:break-all; }
+.adm-usuario small { display:block; opacity:.7; margin:2px 0 8px; }
+.adm-usuario-botones { display:flex; flex-wrap:wrap; gap:8px; }
+.btn-ancho { width:100%; min-height:56px; font-size:1.05rem; }
+.btn-whatsapp { background:#25D366 !important; color:#073b1c !important; }
+
+/* Lámpara como Google Maps: siempre azul, sin el punto verde viejo */
+.pin3d-usuario { display:none !important; }
+.lampara-punto.cerca { background:#4285F4 !important; }
+.lampara-haz.cerca { --c:66,133,244 !important; }
+.lampara-haz { width:200px; height:200px; }
 </style>
 </head>
 <body>
@@ -6098,16 +6116,26 @@ if (mapa3D) {
     }, 800);
 
     // ---------- Rol ----------
-    function aplicarRol(rol, correo) {
-        document.body.classList.remove('rol-admin', 'rol-visitante');
-        document.body.classList.add(rol === 'admin' ? 'rol-admin' : 'rol-visitante');
-        $('correoAdmin').textContent = correo || '';
+     function aplicarRol(rol, correo) {
+        document.body.classList.remove('rol-admin', 'rol-maestro', 'rol-visitante');
+        if (rol === 'maestro') document.body.classList.add('rol-admin', 'rol-maestro');
+        else if (rol === 'admin') document.body.classList.add('rol-admin');
+        else document.body.classList.add('rol-visitante');
+        $('correoAdmin').textContent = (rol === 'maestro' ? '👑 Maestro · ' : rol === 'admin' ? 'Administrador · ' : '') + (correo || '');
     }
     $('btnIngresar').addEventListener('click', function() { aplicarRol('visitante'); });
 
-    function entrarComoAdmin(correo) {
-        $('btnIngresar').click();      // cierra la portada igual que siempre
-        aplicarRol('admin', correo);   // y después se marca como administrador
+        async function entrarComoAdmin(correo) {
+        const perfil = await window.cargarPerfilAdmin();
+        if (!perfil) {   // tiene sesión pero no es administrador
+            try { await _supabase.auth.signOut(); } catch (e) {}
+            msgLogin('❌ Esa cuenta no es de administrador.');
+            modalLogin.classList.remove('hidden');
+            return;
+        }
+        $('btnIngresar').click();
+        aplicarRol(perfil.rol, correo);
+        if (perfil.debe_cambiar_clave) window.abrirMiCuenta(true);
     }
 
     // ---------- Login ----------
@@ -6416,6 +6444,210 @@ setInterval(function() {
     });
 
     pintar();
+})();
+// ===============================================================
+// ROLES: Mi cuenta (todos los admins) + Administradores (solo maestro)
+// ===============================================================
+(function() {
+    const $ = function(id) { return document.getElementById(id); };
+
+    // Lo que NO corresponde a un administrador
+    ['btnSubirHorario', 'resultadoHorario', 'panelOffline', 'btnEventos', 'leyenda'].forEach(function(id) {
+        const el = $(id); if (el) el.classList.add('solo-visitante');
+    });
+
+    window.cargarPerfilAdmin = async function() {
+        try {
+            const u = await _supabase.auth.getUser();
+            if (!u.data || !u.data.user) return null;
+            const r = await _supabase.from('perfiles').select('rol,email,debe_cambiar_clave')
+                .eq('user_id', u.data.user.id).maybeSingle();
+            return r.data || null;
+        } catch (e) { return null; }
+    };
+
+    // Botones del menú ☰
+    const btnMi = document.createElement('button');
+    btnMi.id = 'btnMiCuenta'; btnMi.className = 'btn-estadisticas solo-admin';
+    btnMi.textContent = '👤 Mi cuenta (contraseña y correo)';
+    const btnAd = document.createElement('button');
+    btnAd.id = 'btnAdministradores'; btnAd.className = 'btn-estadisticas solo-maestro';
+    btnAd.textContent = '👑 Administradores';
+    $('btnAdminEventos').insertAdjacentElement('afterend', btnMi);
+    btnMi.insertAdjacentElement('afterend', btnAd);
+
+    function msg(id, texto, error) { const el = $(id); el.textContent = texto; el.style.color = error ? '#B23A48' : ''; }
+
+    async function llamar(cuerpo) {
+        const r = await _supabase.functions.invoke('admin-usuarios', { body: cuerpo });
+        if (r.error) {
+            let d = r.error.message || 'Error';
+            try { const j = await r.error.context.json(); if (j && j.error) d = j.error; } catch (e) {}
+            if (/Failed to send|not found|404/i.test(d)) d = 'Falta activar la función en Supabase (Paso 2).';
+            throw new Error(d);
+        }
+        return r.data;
+    }
+
+    // ---------- Ventana: Mi cuenta ----------
+    const mc = document.createElement('div');
+    mc.className = 'modal-estadisticas-overlay hidden'; mc.style.zIndex = '10045';
+    mc.innerHTML =
+        '<div class="modal-estadisticas">' +
+          '<h2>👤 Mi cuenta</h2>' +
+          '<p class="modal-sub" id="mcAviso"></p>' +
+          '<div class="adm-bloque"><h3>🔑 Cambiar mi contraseña</h3>' +
+            '<input class="ev-input" type="password" id="mcPass1" placeholder="Nueva contraseña (mínimo 8)" autocomplete="new-password">' +
+            '<input class="ev-input" type="password" id="mcPass2" placeholder="Repite la contraseña" autocomplete="new-password">' +
+            '<button class="ev-btn btn-ancho" id="mcGuardarPass">Guardar contraseña</button>' +
+            '<p class="ev-msg" id="mcPassMsg"></p></div>' +
+          '<div class="adm-bloque"><h3>📧 Cambiar mi correo (mi usuario para entrar)</h3>' +
+            '<input class="ev-input" type="email" id="mcCorreo" placeholder="Nuevo correo" autocomplete="off">' +
+            '<button class="ev-btn btn-ancho" id="mcGuardarCorreo">Guardar correo</button>' +
+            '<p class="ev-msg" id="mcCorreoMsg"></p></div>' +
+          '<button class="btn-cerrar-estadisticas" id="mcCerrar">Cerrar</button>' +
+        '</div>';
+    document.body.appendChild(mc);
+
+    window.abrirMiCuenta = function(obligatorio) {
+        $('mcAviso').textContent = obligatorio ? '⚠️ Es tu primer ingreso: cambia la contraseña temporal por una tuya.' : '';
+        mc.classList.remove('hidden');
+    };
+    btnMi.addEventListener('click', function() { window.abrirMiCuenta(false); });
+    $('mcCerrar').addEventListener('click', function() { mc.classList.add('hidden'); });
+
+    $('mcGuardarPass').addEventListener('click', async function() {
+        const a = $('mcPass1').value, b = $('mcPass2').value;
+        if (a.length < 8) return msg('mcPassMsg', 'Mínimo 8 caracteres.', true);
+        if (a !== b) return msg('mcPassMsg', 'Las dos contraseñas no coinciden.', true);
+        msg('mcPassMsg', 'Guardando…');
+        const r = await _supabase.auth.updateUser({ password: a });
+        if (r.error) return msg('mcPassMsg', 'No se pudo: ' + r.error.message, true);
+        try { await _supabase.rpc('clave_cambiada'); } catch (e) {}
+        $('mcPass1').value = ''; $('mcPass2').value = '';
+        $('mcAviso').textContent = '';
+        msg('mcPassMsg', '✅ Contraseña cambiada.');
+    });
+
+    $('mcGuardarCorreo').addEventListener('click', async function() {
+        const c = $('mcCorreo').value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return msg('mcCorreoMsg', 'Escribe un correo válido.', true);
+        msg('mcCorreoMsg', 'Guardando…');
+        try {
+            await llamar({ accion: 'mi_correo', email: c });
+            try { await _supabase.auth.refreshSession(); } catch (e) {}
+            $('mcCorreo').value = '';
+            const cab = $('correoAdmin');
+            if (cab) cab.textContent = cab.textContent.split('·')[0] + '· ' + c;
+            msg('mcCorreoMsg', '✅ Listo. Desde ahora entras con ' + c);
+        } catch (e) { msg('mcCorreoMsg', e.message, true); }
+    });
+
+    // ---------- Ventana: Administradores (maestro) ----------
+    const ad = document.createElement('div');
+    ad.className = 'modal-estadisticas-overlay hidden'; ad.style.zIndex = '10045';
+    ad.innerHTML =
+        '<div class="modal-estadisticas modal-ancho">' +
+          '<h2>👑 Administradores</h2>' +
+          '<div class="adm-bloque"><h3>➕ Agregar administrador</h3>' +
+            '<input class="ev-input" type="email" id="adCorreo" placeholder="Correo del nuevo administrador" autocomplete="off">' +
+            '<input class="ev-input" type="tel" id="adTel" placeholder="Su celular de WhatsApp (ej. 71234567)" autocomplete="off">' +
+            '<button class="ev-btn btn-ancho" id="adCrear">Crear administrador</button>' +
+            '<p class="ev-msg" id="adCrearMsg"></p>' +
+            '<div id="adEnvio"></div></div>' +
+          '<div class="adm-bloque"><h3>Administradores actuales</h3><div id="adLista">…</div></div>' +
+          '<button class="btn-cerrar-estadisticas" id="adCerrar">Cerrar</button>' +
+        '</div>';
+    document.body.appendChild(ad);
+
+    function normalizarTelefono(t) {
+        let d = (t || '').replace(/\D/g, '');
+        if (d.length === 8) d = '591' + d;   // celular de Bolivia sin código de país
+        return d;
+    }
+    function mensajeWhatsApp(correo, clave) {
+        return '🎓 *Mapa Inteligente UAGRM*\n' +
+            'Te agregaron como administrador.\n\n' +
+            '🔗 Entra aquí: ' + location.origin + location.pathname + '\n' +
+            '(toca "🔐 Administrador")\n\n' +
+            '📧 Usuario: ' + correo + '\n' +
+            '🔑 Contraseña temporal: ' + clave + '\n\n' +
+            'Al entrar te pediremos cambiar la contraseña.';
+    }
+
+    // Muestra el botón de WhatsApp (se toca de nuevo para que el navegador no lo bloquee)
+    let pendienteEnvio = null;
+    function mostrarEnvio(d) {
+        pendienteEnvio = d;
+        const tel = normalizarTelefono(d.telefono);
+        $('adEnvio').innerHTML =
+            '<p class="ev-msg"><b>' + esc(d.email) + '</b><br>Contraseña temporal: <b>' + esc(d.password) + '</b><br>' +
+            '<small>Solo se muestra ahora. Si se pierde, usa "Reiniciar contraseña".</small></p>' +
+            (tel
+              ? '<button class="ev-btn btn-ancho btn-whatsapp" id="adWhats">📲 Enviar por WhatsApp</button>'
+              : '<p class="ev-msg">Sin celular guardado: copia estos datos y envíaselos tú.</p>');
+        const b = $('adWhats');
+        if (b) b.addEventListener('click', function() {
+            window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(mensajeWhatsApp(pendienteEnvio.email, pendienteEnvio.password)), '_blank', 'noopener');
+        });
+    }
+
+    async function cargarLista() {
+        const cont = $('adLista');
+        cont.textContent = 'Cargando…';
+        try {
+            const d = await llamar({ accion: 'listar' });
+            cont.innerHTML = d.usuarios.map(function(u) {
+                const maestro = u.rol === 'maestro';
+                return '<div class="adm-usuario"><b>' + (maestro ? '👑 ' : '') + esc(u.email) + (u.id === d.yo ? ' (tú)' : '') + '</b>' +
+                    '<small>' + (maestro ? 'Administrador maestro' : 'Administrador') +
+                    (u.pendiente ? ' · aún no cambia su contraseña temporal' : '') +
+                    ' · ' + (u.ultimo_acceso ? 'último acceso ' + esc(new Date(u.ultimo_acceso).toLocaleString('es-BO')) : 'aún no ha entrado') + '</small>' +
+                    (maestro ? '' :
+                      '<div class="adm-usuario-botones">' +
+                        '<button class="ev-btn" data-ad-reiniciar="' + esc(u.id) + '">Reiniciar contraseña</button>' +
+                        '<button class="ev-btn ev-del" data-ad-quitar="' + esc(u.id) + '" data-correo="' + esc(u.email) + '">Quitar</button>' +
+                      '</div>') +
+                    '</div>';
+            }).join('') || 'No hay administradores.';
+        } catch (e) { cont.textContent = '⚠️ ' + e.message; }
+    }
+
+    btnAd.addEventListener('click', function() { ad.classList.remove('hidden'); $('adEnvio').innerHTML = ''; cargarLista(); });
+    $('adCerrar').addEventListener('click', function() { ad.classList.add('hidden'); $('adEnvio').innerHTML = ''; pendienteEnvio = null; });
+
+    $('adCrear').addEventListener('click', async function() {
+        const correo = $('adCorreo').value.trim(), tel = normalizarTelefono($('adTel').value);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return msg('adCrearMsg', 'Escribe un correo válido.', true);
+        if (tel.length < 10) return msg('adCrearMsg', 'Escribe el celular (8 dígitos o con código de país).', true);
+        msg('adCrearMsg', 'Creando…');
+        try {
+            const d = await llamar({ accion: 'crear', email: correo, telefono: tel });
+            $('adCorreo').value = ''; $('adTel').value = '';
+            msg('adCrearMsg', '✅ Administrador creado. Envíale sus datos:');
+            mostrarEnvio(d);
+            cargarLista();
+        } catch (e) { msg('adCrearMsg', e.message, true); }
+    });
+
+    $('adLista').addEventListener('click', async function(e) {
+        const r = e.target.closest('[data-ad-reiniciar]');
+        const q = e.target.closest('[data-ad-quitar]');
+        try {
+            if (r) {
+                if (!confirm('¿Generar una contraseña temporal nueva para este administrador?')) return;
+                const d = await llamar({ accion: 'reiniciar', id: r.getAttribute('data-ad-reiniciar') });
+                msg('adCrearMsg', '✅ Contraseña reiniciada. Envíale sus datos:');
+                mostrarEnvio(d);
+                $('adEnvio').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                cargarLista();
+            } else if (q) {
+                if (!confirm('¿Quitar a ' + q.getAttribute('data-correo') + ' como administrador? Ya no podrá entrar.')) return;
+                await llamar({ accion: 'quitar', id: q.getAttribute('data-ad-quitar') });
+                cargarLista();
+            }
+        } catch (err) { alert('⚠️ ' + err.message); }
+    });
 })();
 </script>
 
