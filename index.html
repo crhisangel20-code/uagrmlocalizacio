@@ -1522,10 +1522,11 @@ html { -webkit-text-size-adjust: 100%; }
 /* ===== ROLES: ADMINISTRADOR / VISITANTE ===== */
 body:not(.rol-admin) .solo-admin { display: none !important; }
 
-.portada-botones { display:flex; flex-direction:column; gap:14px; width:min(340px,86vw); margin-top:14px; }
+.portada-botones { display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center; gap:14px; width:min(640px,94vw); margin-top:14px; }
 .portada-botones button {
-    width:100%; min-height:66px; margin:0 !important; border-radius:40px;
-    font-size:1.2rem; font-weight:700; font-family:var(--font-body); cursor:pointer;
+    flex:1 1 240px; width:auto; min-height:66px; margin:0 !important; border-radius:40px;
+    font-size:1.1rem; font-weight:700; font-family:var(--font-body); cursor:pointer;
+    white-space:nowrap; padding:0 22px;
 }
 #btnPortadaAdmin { border:3px solid var(--oro-escudo); background:transparent; color:#fff; }
 #btnPortadaAdmin:hover { background:rgba(255,255,255,.14); }
