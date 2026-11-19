@@ -6669,6 +6669,127 @@ setInterval(function() {
     });
 })();
 </script>
+<style>
+/* ===== Panel lateral deslizable (reemplaza al panel de abajo) ===== */
+body #hojaInferior {
+  position: absolute !important;
+  top: 84px !important;
+  bottom: 12px !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(84vw, 330px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: translateX(105%) !important;
+  transition: transform .3s ease !important;
+  border-radius: 20px 0 0 20px !important;
+  padding: 14px 12px 16px !important;
+  box-shadow: -6px 0 24px rgba(0,0,0,.3) !important;
+  overflow-y: auto !important;
+}
+body #hojaInferior.abierta { transform: translateX(0) !important; }
+body #hojaInferior #asaHoja { display: none !important; }
+body #hojaInferior #tarjetaDestino3D { max-height: none !important; }
 
+/* Pestaña dorada que invita a deslizar */
+#pestanaLateral {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10003;
+  border: none;
+  background: #D9A441;
+  color: #0A4A35;
+  font-weight: 800;
+  font-size: 1rem;
+  font-family: var(--font-body);
+  padding: 18px 10px;
+  border-radius: 16px 0 0 16px;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  animation: pulsoPestana 1.6s ease-in-out infinite;
+}
+#pestanaLateral.oculta { display: none; }
+@keyframes pulsoPestana {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217,164,65,.8), 0 4px 14px rgba(0,0,0,.35); }
+  50%      { box-shadow: 0 0 0 12px rgba(217,164,65,0), 0 4px 14px rgba(0,0,0,.35); }
+}
+
+/* Terminar ruta: flotando abajo a la izquierda del mapa */
+body #contenedor3D > #btnTerminarRuta {
+  position: absolute !important;
+  left: 10px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+</style>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var hoja = $('hojaInferior'), cont = $('contenedor3D');
+  if (!hoja || !cont) return;
+
+  // Pestaña dorada
+  var tab = document.createElement('button');
+  tab.id = 'pestanaLateral';
+  tab.textContent = '◀ DESLIZA · OPCIONES';
+  cont.appendChild(tab);
+
+  // "Terminar ruta" sale del panel y queda sobre el mapa
+  var terminar = $('btnTerminarRuta');
+  if (terminar) cont.appendChild(terminar);
+
+  function abrir()  { hoja.classList.add('abierta');    tab.classList.add('oculta'); }
+  function cerrar() { hoja.classList.remove('abierta'); tab.classList.remove('oculta'); }
+
+  tab.addEventListener('click', abrir);
+
+  // Deslizar con el dedo: desde el borde derecho abre, hacia la derecha cierra
+  var x0 = null, y0 = null;
+  cont.addEventListener('touchstart', function (e) {
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  cont.addEventListener('touchend', function (e) {
+    if (x0 === null) return;
+    var p = e.changedTouches[0];
+    var dx = p.clientX - x0, dy = p.clientY - y0;
+    var abierta = hoja.classList.contains('abierta');
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0 && !abierta && x0 > window.innerWidth - 70) abrir();
+      else if (dx > 0 && abierta) cerrar();
+    }
+    x0 = null;
+  }, { passive: true });
+
+  // Tocar el mapa cierra el panel
+  cont.addEventListener('click', function (e) {
+    if (!hoja.classList.contains('abierta')) return;
+    if (hoja.contains(e.target) || tab.contains(e.target)) return;
+    cerrar();
+  });
+
+  // Al elegir un destino, el panel se abre
+  var lista = $('targetid');
+  if (lista) lista.addEventListener('change', abrir);
+
+  // Cuando la ruta está lista (aparece "Empezar a caminar"), se abre solo
+  var empezar = $('btnIniciarRutaPie');
+  var yaVisible = false;
+  setInterval(function () {
+    var visible = empezar && !empezar.classList.contains('hidden');
+    if (visible && !yaVisible) abrir();
+    yaVisible = visible;
+  }, 500);
+
+  // Al empezar a caminar, el panel se esconde
+  if (empezar) empezar.addEventListener('click', cerrar);
+})();
+</script>
 </body>
 </html>
