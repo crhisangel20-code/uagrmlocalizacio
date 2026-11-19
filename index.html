@@ -1663,6 +1663,25 @@ body.rol-admin .solo-visitante { display:none !important; }
 .lampara-haz.cerca { --c:66,133,244 !important; }
 .lampara-haz { width:200px; height:200px; }
 </style>
+<style>
+/* ===== Administrador: ve solo su panel, sin mapa ===== */
+body.rol-admin #contenedor3D { display: none !important; }
+body.rol-admin #appContainer {
+    left: 0 !important;
+    visibility: visible !important;
+    overflow-y: auto !important;
+}
+body.rol-admin #btnVolverMapa,
+body.rol-admin header.hero,
+body.rol-admin .franja-bandera,
+body.rol-admin .search-section > label,
+body.rol-admin .footer-note,
+body.rol-admin .nota-mapa { display: none !important; }
+body.rol-admin main { padding-top: 70px; }
+
+/* ===== Visitante: el botón Eventos solo aparece una vez ===== */
+#btnEventos { display: none !important; }
+</style>
 </head>
 <body>
 <div class="banner-offline off-oculto" id="bannerOffline"></div>
