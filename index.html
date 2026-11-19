@@ -4147,7 +4147,7 @@ function urlGoogleMapsEvento(ev) {
 async function cargarEventos() {
     const ahora = new Date().toISOString();
     const r = await _supabase.from('eventos').select('*')
-        .lte('fecha_inicio', ahora).gte('fecha_fin', ahora)
+        .gte('fecha_fin', ahora)
         .order('fecha_inicio', { ascending: true });
     if (r.error) { console.warn('No se pudieron cargar eventos:', r.error.message); return; }
     eventosVigentes = r.data || [];
@@ -4174,7 +4174,7 @@ function pintarEventosEnMapa() {
 
 function renderEventosPublicos() {
     const cont = byId('listaEventosPublicos');
-    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
+  const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) !== 'vencido'; });
     if (!lista.length) {
         cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
         return;
@@ -4184,7 +4184,7 @@ function renderEventosPublicos() {
             (ev.imagen_url ? '<img src="' + esc(ev.imagen_url) + '" alt="' + esc(ev.titulo) + '" loading="lazy">' : '') +
             '<div class="ev-card-body">' +
                 '<h4>' + esc(ev.titulo) + '</h4>' +
-                '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
+                '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) +'<br>🕒 ' + (estadoEvento(ev) === 'programado' ? 'Empieza: ' + esc(fmtFecha(ev.fecha_inicio)) + '<br>🕒 Hasta: ' : 'Hasta: ') + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
                 (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
                 '<div class="ev-acciones">' +
                     '<button class="ev-btn" data-ev-ir="' + ev.modulo_id + '">🧭 Ruta en el mapa</button>' +
@@ -6207,7 +6207,7 @@ if (mapa3D) {
 // Esta versión REEMPLAZA a la anterior (JavaScript usa la última que encuentra)
 function renderEventosPublicos() {
     const cont = byId('listaEventosPublicos');
-    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
+    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) !== 'vencido'; });
     if (!lista.length) {
         cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
         return;
@@ -6222,7 +6222,7 @@ function renderEventosPublicos() {
                 '<h4>' + esc(ev.titulo) + '</h4>' +
                 '<div class="ev-meta">' +
                     (nombreFac ? '🎓 ' + esc(nombreFac) + '<br>' : '') +
-                    '📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) +
+                   '📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 ' + (estadoEvento(ev) === 'programado' ? 'Empieza: ' + esc(fmtFecha(ev.fecha_inicio)) + '<br>🕒 Hasta: ' : 'Hasta: ') + esc(fmtFecha(ev.fecha_fin)) +
                 '</div>' +
                 (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
                 '<div class="ev-acciones">' +
