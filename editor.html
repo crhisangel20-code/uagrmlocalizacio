@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editor de senderos · UAGRM</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--v:#0A4A35;--o:#D9A441;--c:#FBF8F1;--t:#1C2620}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;color:var(--t);background:var(--c)}
+#barra{background:var(--v);color:#fff;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#barra h1{font-size:1rem;font-weight:700;margin-right:10px}
+#barra .sep{width:1px;height:26px;background:#ffffff40;margin:0 4px}
+#barra button,#barra .btn{border:0;border-radius:8px;padding:8px 12px;font-family:inherit;font-weight:600;font-size:.85rem;cursor:pointer;background:#e6efe9;color:var(--v)}
+#barra button:hover,#barra .btn:hover{background:#fff}
+#barra button.on{background:var(--o);color:#1C2620}
+#barra label{font-size:.82rem;display:flex;gap:5px;align-items:center}
+#barra button:focus-visible,#barra .btn:focus-within{outline:3px solid var(--o);outline-offset:2px}
+#mapa{flex:1;min-height:0}
+#info{position:absolute;left:12px;bottom:12px;z-index:900;background:#fffffff2;border-left:6px solid var(--o);border-radius:10px;padding:10px 14px;max-width:min(420px,calc(100% - 24px));box-shadow:0 4px 18px #0004;font-size:.88rem;line-height:1.45}
+#info b{color:var(--v)}
+#msg{margin-top:6px;font-weight:600}
+.nd{width:14px;height:14px;border-radius:50%;background:#3E7CB1;border:2px solid #fff;box-shadow:0 0 0 1px #0007}
+.nd.pu{background:#22c55e;border-radius:3px}
+.nd.sel{background:var(--o);transform:scale(1.5)}
+.nd.mal{background:#ff2d2d;box-shadow:0 0 0 6px #ff2d2d80;animation:p 1s ease-in-out infinite}
+@keyframes p{50%{transform:scale(1.5)}}
+@media (prefers-reduced-motion:reduce){.nd.mal{animation:none}}
+.ed{background:var(--v);color:#fff;font:700 11px system-ui;padding:1px 4px;border-radius:5px;text-align:center;border:1px solid #fff}
+.ed.ok{background:#16a34a}.ed.sel{background:var(--o);color:#000}
+</style>
+</head>
+<body>
+<div id="barra">
+  <h1>Editor de senderos</h1>
+  <button class="modo on" data-m="trazar">✏️ Trazar</button>
+  <button class="modo" data-m="mover">✋ Mover</button>
+  <button class="modo" data-m="borrar">🗑️ Borrar</button>
+  <button class="modo" data-m="puerta">🚪 Puerta</button>
+  <span class="sep"></span>
+  <button id="bDes">↩️ Deshacer</button>
+  <button id="bVer">🔎 Verificar red</button>
+  <span class="sep"></span>
+  <label class="btn">📂 Abrir<input id="fArch" type="file" accept=".json,.html" hidden></label>
+  <button id="bExp">💾 Descargar senderos.json</button>
+  <label><input id="cEd" type="checkbox" checked> Ver módulos</label>
+</div>
+<div id="mapa"></div>
+<div id="info">
+  <div id="est">Cargando…</div>
+  <div id="hint"></div>
+  <div id="msg"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var red = { nodos: [], aristas: [] }, edif = [], modo = 'trazar';
+var sel = null, edSel = null, malos = new Set(), largas = new Set(), hist = [], sinGuardar = false, sigId = 1, grupos = null;
+
+var mapa = L.map('mapa', { preferCanvas: true, maxZoom: 21 }).setView([-17.7755, -63.1945], 17);
+var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19 }).addTo(mapa);
+var calles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19 });
+L.control.layers({ '🛰️ Satélite': sat, '🗺️ Calles': calles }).addTo(mapa);
+var capaA = L.layerGroup().addTo(mapa), capaE = L.layerGroup().addTo(mapa), capaN = L.layerGroup().addTo(mapa);
+
+var $ = function (id) { return document.getElementById(id); };
+var HINTS = {
+  trazar: 'Clic en el mapa crea un nodo unido al anterior. Clic en un nodo existente sigue el trazo desde ahí. Esc suelta.',
+  mover: 'Arrastra un nodo para corregir su posición.',
+  borrar: 'Clic en un nodo o en una línea para borrarlo.',
+  puerta: '1) Clic en el cuadro del módulo. 2) Clic en su puerta real. La puerta queda unida al nodo más cercano.'
+};
+function msg(t) { $('msg').textContent = t || ''; }
+function porId() { var m = {}; red.nodos.forEach(function (n) { m[n.id] = n; }); return m; }
+function clave(a, b) { return a < b ? a + '-' + b : b + '-' + a; }
+function existe(a, b) { return red.aristas.some(function (p) { return clave(p[0], p[1]) === clave(a, b); }); }
+function snap() { hist.push(JSON.stringify(red)); if (hist.length > 60) hist.shift(); sinGuardar = true; grupos = null; malos = new Set(); largas = new Set(); }
+
+function cargar(obj, origen) {
+  var m = {}, vistos = new Set(), ar = [], quitadas = 0;
+  red = { nodos: obj.nodos.map(function (n) { return Object.assign({}, n); }), aristas: [] };
+  red.nodos.forEach(function (n) { m[n.id] = n; });
+  obj.aristas.forEach(function (p) {
+    var k = clave(p[0], p[1]);
+    if (p[0] === p[1] || !m[p[0]] || !m[p[1]] || vistos.has(k)) { quitadas++; return; }
+    vistos.add(k); ar.push([p[0], p[1]]);
+  });
+  red.aristas = ar;
+  sigId = red.nodos.reduce(function (a, n) { return Math.max(a, n.id); }, 0) + 1;
+  hist = []; sinGuardar = quitadas > 0; sel = null; malos = new Set(); largas = new Set(); grupos = null;
+  if (red.nodos.length) mapa.fitBounds(L.latLngBounds(red.nodos.map(function (n) { return [n.lat, n.lng]; })), { padding: [40, 40] });
+  msg('Red cargada desde ' + origen + (quitadas ? ' · se quitaron ' + quitadas + ' conexiones repetidas o rotas.' : '.'));
+  dibujar();
+}
+
+function extraer(txt, ini, abre, cierra) {
+  var i = txt.indexOf(ini); if (i < 0) return null;
+  var j = txt.indexOf(abre, i), d = 0, k = j;
+  for (; k < txt.length; k++) { var c = txt[k]; if (c === abre) d++; else if (c === cierra) { d--; if (!d) break; } }
+  return txt.slice(j, k + 1);
+}
+function desdeIndex(txt) {
+  var r = extraer(txt, 'let redSenderos', '{', '}'), e = extraer(txt, 'const edificios', '[', ']');
+  return { red: r ? JSON.parse(r) : null, edif: e ? (new Function('return ' + e))() : null };
+}
+
+function tienePuerta(id) { return red.nodos.some(function (n) { return n.puerta === id; }); }
+function icono(cls, w, h) { return L.divIcon({ className: '', html: '<div class="' + cls + '"></div>', iconSize: [w, h], iconAnchor: [w / 2, h / 2] }); }
+
+function dibujar() {
+  capaA.clearLayers(); capaE.clearLayers(); capaN.clearLayers();
+  var m = porId();
+  red.aristas.forEach(function (p) {
+    var A = m[p[0]], B = m[p[1]], larga = largas.has(clave(p[0], p[1]));
+    L.polyline([[A.lat, A.lng], [B.lat, B.lng]], { color: larga ? '#ff7a00' : '#ffd166', weight: larga ? 4 : 3, opacity: .95, dashArray: larga ? '6 6' : null })
+      .addTo(capaA).on('click', function (ev) {
+        if (modo !== 'borrar') return;
+        L.DomEvent.stop(ev); snap();
+        red.aristas = red.aristas.filter(function (q) { return clave(q[0], q[1]) !== clave(p[0], p[1]); });
+        dibujar();
+      });
+  });
+  if ($('cEd').checked) edif.forEach(function (e) {
+    var num = (e.nombre.match(/\d{3}/) || [e.nombre.replace(/[^A-Za-z0-9]/g, '').slice(0, 4)])[0];
+    var cls = 'ed' + (tienePuerta(e.id) ? ' ok' : '') + (edSel === e.id ? ' sel' : '');
+    L.marker([e.lat, e.lng], { icon: L.divIcon({ className: '', html: '<div class="' + cls + '">' + num + '</div>', iconSize: [36, 18], iconAnchor: [18, 9] }), zIndexOffset: -100 }).addTo(capaE)
+      .bindTooltip(e.nombre.replace(/^↪\s*/, '')).on('click', function (ev) {
+        L.DomEvent.stop(ev);
+        if (modo !== 'puerta') return;
+        edSel = e.id; msg('Ahora haz clic en la puerta de ' + e.nombre.replace(/^↪\s*/, '') + '.'); dibujar();
+      });
+  });
+  red.nodos.forEach(function (n) {
+    var cls = 'nd' + (n.puerta ? ' pu' : '') + (malos.has(n.id) ? ' mal' : '') + (sel === n.id ? ' sel' : '');
+    var mk = L.marker([n.lat, n.lng], { icon: icono(cls, 14, 14), draggable: modo === 'mover', keyboard: false }).addTo(capaN);
+    mk.on('click', function (ev) { L.DomEvent.stop(ev); clicNodo(n); });
+    mk.on('dragstart', snap);
+    mk.on('dragend', function (ev) { var p = ev.target.getLatLng(); n.lat = p.lat; n.lng = p.lng; dibujar(); });
+  });
+  var pu = red.nodos.filter(function (n) { return n.puerta; }).length;
+  $('est').innerHTML = '<b>' + red.nodos.length + '</b> nodos · <b>' + red.aristas.length + '</b> conexiones · <b>' + pu + '</b> de ' + edif.length + ' módulos con puerta' +
+    (grupos ? ' · <b>' + grupos + '</b> grupo(s)' : '');
+  $('hint').textContent = HINTS[modo];
+}
+
+function nuevoNodo(lat, lng, extra) { var n = Object.assign({ id: sigId++, lat: lat, lng: lng }, extra || {}); red.nodos.push(n); return n; }
+function unir(a, b) { if (a !== b && !existe(a, b)) red.aristas.push([a, b]); }
+
+function clicNodo(n) {
+  if (modo === 'borrar') {
+    snap(); red.nodos = red.nodos.filter(function (x) { return x.id !== n.id; });
+    red.aristas = red.aristas.filter(function (p) { return p[0] !== n.id && p[1] !== n.id; });
+    if (sel === n.id) sel = null; dibujar();
+  } else if (modo === 'trazar') {
+    if (sel === n.id) sel = null;
+    else { if (sel !== null) { snap(); unir(sel, n.id); } sel = n.id; }
+    dibujar();
+  }
+}
+
+mapa.on('click', function (ev) {
+  if (modo === 'trazar') {
+    snap(); var n = nuevoNodo(ev.latlng.lat, ev.latlng.lng);
+    if (sel !== null) unir(sel, n.id);
+    sel = n.id; dibujar();
+  } else if (modo === 'puerta' && edSel !== null) {
+    snap();
+    var viejas = red.nodos.filter(function (n) { return n.puerta === edSel; }).map(function (n) { return n.id; });
+    red.nodos = red.nodos.filter(function (n) { return viejas.indexOf(n.id) < 0; });
+    red.aristas = red.aristas.filter(function (p) { return viejas.indexOf(p[0]) < 0 && viejas.indexOf(p[1]) < 0; });
+    var d = nuevoNodo(ev.latlng.lat, ev.latlng.lng, { puerta: edSel }), mejor = null, dm = 1e9;
+    red.nodos.forEach(function (n) {
+      if (n.puerta) return;
+      var dist = L.latLng(n.lat, n.lng).distanceTo(ev.latlng); if (dist < dm) { dm = dist; mejor = n; }
+    });
+    if (mejor && dm <= 80) { unir(d.id, mejor.id); msg('Puerta guardada y unida al nodo más cercano (' + Math.round(dm) + ' m).'); }
+    else msg('Puerta guardada, pero no hay un nodo a menos de 80 m. Únela con un trazo.');
+    edSel = null; dibujar();
+  }
+});
+mapa.on('contextmenu', function () { sel = null; edSel = null; dibujar(); });
+
+function verificar() {
+  if (!red.nodos.length) return;
+  var ady = {}; red.nodos.forEach(function (n) { ady[n.id] = []; });
+  red.aristas.forEach(function (p) { ady[p[0]].push(p[1]); ady[p[1]].push(p[0]); });
+  var vis = new Set(), gs = [];
+  red.nodos.forEach(function (n) {
+    if (vis.has(n.id)) return;
+    var cola = [n.id], g = []; vis.add(n.id);
+    while (cola.length) { var x = cola.shift(); g.push(x); ady[x].forEach(function (y) { if (!vis.has(y)) { vis.add(y); cola.push(y); } }); }
+    gs.push(g);
+  });
+  gs.sort(function (a, b) { return b.length - a.length; });
+  malos = new Set(); gs.slice(1).forEach(function (g) { g.forEach(function (id) { malos.add(id); }); });
+  var m = porId(); largas = new Set();
+  red.aristas.forEach(function (p) { if (L.latLng(m[p[0]].lat, m[p[0]].lng).distanceTo([m[p[1]].lat, m[p[1]].lng]) > 45) largas.add(clave(p[0], p[1])); });
+  grupos = gs.length; dibujar();
+  var t = gs.length === 1 ? '✅ Toda la red está conectada.' : '⚠️ Hay ' + gs.length + ' grupos separados. Los nodos rojos no llegan al grupo principal.';
+  t += largas.size ? ' ' + largas.size + ' conexión(es) de más de 45 m en naranja: revisa que no crucen un edificio.' : '';
+  msg(t);
+  if (malos.size) mapa.fitBounds(L.latLngBounds(red.nodos.filter(function (n) { return malos.has(n.id); }).map(function (n) { return [n.lat, n.lng]; })), { padding: [80, 80], maxZoom: 20 });
+}
+
+function exportar() {
+  var out = {
+    nodos: red.nodos.map(function (n) { var o = { id: n.id, lat: +n.lat.toFixed(7), lng: +n.lng.toFixed(7) }; if (n.puerta) o.puerta = n.puerta; return o; }),
+    aristas: red.aristas
+  };
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' }));
+  a.download = 'senderos.json'; a.click(); sinGuardar = false;
+  msg('Archivo descargado. Súbelo a GitHub reemplazando senderos.json.');
+}
+
+document.querySelectorAll('.modo').forEach(function (b) {
+  b.addEventListener('click', function () {
+    modo = b.getAttribute('data-m'); edSel = null; sel = null;
+    document.querySelectorAll('.modo').forEach(function (x) { x.classList.toggle('on', x === b); });
+    msg(''); dibujar();
+  });
+});
+$('bDes').addEventListener('click', deshacer);
+function deshacer() { if (!hist.length) return; red = JSON.parse(hist.pop()); sel = null; malos = new Set(); largas = new Set(); grupos = null; dibujar(); }
+$('bVer').addEventListener('click', verificar);
+$('bExp').addEventListener('click', exportar);
+$('cEd').addEventListener('change', dibujar);
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { sel = null; edSel = null; dibujar(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); deshacer(); }
+});
+window.addEventListener('beforeunload', function (e) { if (sinGuardar) { e.preventDefault(); e.returnValue = ''; } });
+
+$('fArch').addEventListener('change', function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function () {
+    try {
+      if (/\.html?$/i.test(f.name)) {
+        var x = desdeIndex(r.result); if (x.edif) edif = x.edif;
+        if (!x.red) throw new Error('sin red'); cargar(x.red, f.name);
+      } else cargar(JSON.parse(r.result), f.name);
+    } catch (err) { msg('❌ No pude leer ese archivo. Elige senderos.json o index.html.'); }
+  };
+  r.readAsText(f); e.target.value = '';
+});
+
+(async function () {
+  var redIndex = null, ok = false;
+  try { var r = await fetch('index.html', { cache: 'no-store' }); if (r.ok) { var x = desdeIndex(await r.text()); edif = x.edif || []; redIndex = x.red; } } catch (e) {}
+  try { var s = await fetch('senderos.json', { cache: 'no-store' }); if (s.ok) { cargar(await s.json(), 'senderos.json'); ok = true; } } catch (e) {}
+  if (!ok && redIndex) { cargar(redIndex, 'index.html'); ok = true; }
+  if (!ok) msg('No pude cargar solo. Usa 📂 Abrir y elige senderos.json o index.html.');
+  dibujar();
+})();
+</script>
+</body>
+</html>
