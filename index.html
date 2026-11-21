@@ -1750,7 +1750,7 @@ body.rol-admin main { padding-top: 70px; }
         <!-- AÑADIDO PARA DETECCIÓN FUERA DEL CAMPUS: aviso de ubicación fuera del campus -->
         <div class="aviso-fuera-campus hidden" id="avisoFueraCampus">
             <span class="aviso-texto">⚠️ Estás fuera del campus universitario. Las rutas mostradas solo aplican dentro de la UAGRM.</span>
-            <a class="btn-google-maps" id="btnGoogleMaps" href="https://www.google.com/maps/dir/?api=1&destination=UAGRM+Universidad+Autonoma+Gabriel+Rene+Moreno+Santa+Cruz+de+la+Sierra+Bolivia" target="_blank" rel="noopener">🗺️ Cómo llegar a la UAGRM</a>
+           
         </div>
 
 <!-- Mapa 3D principal -->
@@ -1948,7 +1948,19 @@ body.rol-admin main { padding-top: 70px; }
     <div class="modal-estadisticas">
         <h2>🎓 Admisión FCEE</h2>
         <p class="modal-sub">Para estudiantes de colegio recién egresados (promoción).</p>
-
+<!-- Conócenos -->
+<details class="adm-conocenos">
+    <summary>🏛️ Conócenos</summary>
+    <div class="adm-conocenos-cuerpo">
+        <p>Conoce la Facultad de Ciencias Económicas y Empresariales y síguenos en redes.</p>
+        <a class="btn-adm-ir" href="https://www.uagrm.edu.bo/facultades/fcee" target="_blank" rel="noopener">🌐 Conoce la facultad</a>
+        <div class="adm-redes">
+            <a class="red-ig" href="https://www.instagram.com/admision.fcee/" target="_blank" rel="noopener">📸 Instagram</a>
+            <a class="red-fb" href="https://www.facebook.com/people/Admisi%C3%B3n-Estudiantil-uagrm-fcee/61555345370054/?sk=reels_tab&locale=es_LA" target="_blank" rel="noopener">👍 Facebook</a>
+            <a class="red-tt" href="https://www.tiktok.com/discover/uagrm-facultad-de-ciencias-econ%C3%B3micas-y-empresariales" target="_blank" rel="noopener">🎵 TikTok</a>
+        </div>
+    </div>
+</details>
         <!-- Avance -->
         <div class="adm-progreso">
             <div class="adm-progreso-barra"><div id="admBarra"></div></div>
@@ -2004,6 +2016,16 @@ body.rol-admin main { padding-top: 70px; }
 
         <button class="btn-adm-reiniciar" id="admReiniciar" type="button">↺ Reiniciar mi lista</button>
         <button class="btn-cerrar-estadisticas" id="btnCerrarAdmision">Cerrar</button>
+    </div>
+</div>
+<!-- Alerta grande: fuera del campus -->
+<div class="modal-fuera-overlay hidden" id="modalFueraCampus">
+    <div class="modal-fuera">
+        <div class="modal-fuera-icono">📍</div>
+        <h2>¡Estás fuera del campus!</h2>
+        <p>La navegación de este mapa funciona <b>solo dentro de la UAGRM</b>. Cuando llegues al campus, abre el mapa otra vez y toca "Llévame al destino".</p>
+        <p class="modal-fuera-dist" id="fueraDistancia"></p>
+        <button class="btn-cerrar-modal" id="btnCerrarFuera">Entendido</button>
     </div>
 </div>
 <!-- Scripts Leaflet y plugins -->
@@ -3493,7 +3515,8 @@ if (!esRecalculoAutomatico) {
     // para evitar el "garabato" visual de líneas. Solo permitimos rutas si está a 200m a la redonda.
     const distanciaAlCampus = distanciaMinimaASenderos(originLatLng.lat, originLatLng.lng);
     if (distanciaAlCampus > 200 && !esRecalculoAutomatico) {
-        statusMsg.innerHTML = '📍 Estás fuera del rango del campus. Usa el botón "🗺️ Cómo llegar a la UAGRM" del aviso amarillo para llegar primero.';
+        statusMsg.innerHTML = '📍 Estás fuera del rango del campus. Cuando llegues a la UAGRM, vuelve a tocar "Llévame al destino".';
+                     mostrarAlertaFueraCampus(distanciaAlCampus);
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
         limpiarCapaRuta();
@@ -4147,7 +4170,7 @@ function urlGoogleMapsEvento(ev) {
 async function cargarEventos() {
     const ahora = new Date().toISOString();
     const r = await _supabase.from('eventos').select('*')
-        .gte('fecha_fin', ahora)
+        .lte('fecha_inicio', ahora).gte('fecha_fin', ahora)
         .order('fecha_inicio', { ascending: true });
     if (r.error) { console.warn('No se pudieron cargar eventos:', r.error.message); return; }
     eventosVigentes = r.data || [];
@@ -4174,7 +4197,7 @@ function pintarEventosEnMapa() {
 
 function renderEventosPublicos() {
     const cont = byId('listaEventosPublicos');
-  const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) !== 'vencido'; });
+    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
     if (!lista.length) {
         cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
         return;
@@ -4184,7 +4207,7 @@ function renderEventosPublicos() {
             (ev.imagen_url ? '<img src="' + esc(ev.imagen_url) + '" alt="' + esc(ev.titulo) + '" loading="lazy">' : '') +
             '<div class="ev-card-body">' +
                 '<h4>' + esc(ev.titulo) + '</h4>' +
-                '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) +'<br>🕒 ' + (estadoEvento(ev) === 'programado' ? 'Empieza: ' + esc(fmtFecha(ev.fecha_inicio)) + '<br>🕒 Hasta: ' : 'Hasta: ') + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
+                '<div class="ev-meta">📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) + '</div>' +
                 (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
                 '<div class="ev-acciones">' +
                     '<button class="ev-btn" data-ev-ir="' + ev.modulo_id + '">🧭 Ruta en el mapa</button>' +
@@ -6207,7 +6230,7 @@ if (mapa3D) {
 // Esta versión REEMPLAZA a la anterior (JavaScript usa la última que encuentra)
 function renderEventosPublicos() {
     const cont = byId('listaEventosPublicos');
-    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) !== 'vencido'; });
+    const lista = eventosVigentes.filter(function(ev) { return estadoEvento(ev) === 'activo'; });
     if (!lista.length) {
         cont.innerHTML = '<div class="ranking-vacio">No hay eventos publicados por ahora.</div>';
         return;
@@ -6222,12 +6245,11 @@ function renderEventosPublicos() {
                 '<h4>' + esc(ev.titulo) + '</h4>' +
                 '<div class="ev-meta">' +
                     (nombreFac ? '🎓 ' + esc(nombreFac) + '<br>' : '') +
-                   '📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 ' + (estadoEvento(ev) === 'programado' ? 'Empieza: ' + esc(fmtFecha(ev.fecha_inicio)) + '<br>🕒 Hasta: ' : 'Hasta: ') + esc(fmtFecha(ev.fecha_fin)) +
+                    '📍 ' + esc(nombreModulo(ev.modulo_id)) + '<br>🕒 Hasta: ' + esc(fmtFecha(ev.fecha_fin)) +
                 '</div>' +
                 (ev.descripcion ? '<p class="ev-desc">' + esc(ev.descripcion) + '</p>' : '') +
                 '<div class="ev-acciones">' +
                     '<button class="ev-btn ev-grande" data-ev-ir="' + esc(String(ev.modulo_id)) + '">🧭 Llévame allí</button>' +
-                    '<button class="ev-btn ev-gm ev-grande" data-ev-gm="' + esc(String(ev.id)) + '">🗺️ Abrir en Google Maps</button>' +
                 '</div>' +
             '</div></div>';
     }).join('');
@@ -6727,6 +6749,43 @@ body #contenedor3D > #btnTerminarRuta {
   width: auto !important;
   margin: 0 !important;
 }
+/* ===== Alerta grande fuera del campus ===== */
+.modal-fuera-overlay {
+    position: fixed; inset: 0; z-index: 10060;
+    background: rgba(60, 10, 15, .8);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-fuera-overlay.hidden { display: none; }
+.modal-fuera {
+    background: #fff; color: #1C2620; max-width: 420px; width: 100%;
+    border-radius: 24px; padding: 30px 24px 24px; text-align: center;
+    border-top: 10px solid #B23A48; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+}
+.modal-fuera-icono { font-size: 3.5rem; line-height: 1; margin-bottom: 8px; }
+.modal-fuera h2 { font-family: var(--font-display); font-size: 1.8rem; color: #B23A48; margin-bottom: 10px; }
+.modal-fuera p { font-size: 1.15rem; line-height: 1.5; margin-bottom: 10px; }
+.modal-fuera-dist { font-weight: 700; color: #0A4A35; }
+.modal-fuera .btn-cerrar-modal { width: 100%; min-height: 60px; font-size: 1.2rem; margin-top: 8px; }
+
+/* ===== Conócenos (Admisión) ===== */
+.adm-conocenos {
+    margin: 12px 0; border-radius: 16px; background: var(--oro-escudo);
+    color: var(--verde-oscuro); overflow: hidden;
+}
+.adm-conocenos summary {
+    list-style: none; cursor: pointer; padding: 16px; text-align: center;
+    font-weight: 800; font-size: 1.2rem; min-height: 56px;
+}
+.adm-conocenos summary::-webkit-details-marker { display: none; }
+.adm-conocenos-cuerpo { background: var(--bg-panel); color: var(--text-main); padding: 12px 14px 14px; }
+.adm-redes { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.adm-redes a {
+    display: flex; align-items: center; justify-content: center; min-height: 52px;
+    border-radius: 14px; color: #fff; font-weight: 700; font-size: 1.05rem; text-decoration: none;
+}
+.red-ig { background: linear-gradient(45deg, #F58529, #DD2A7B, #8134AF); }
+.red-fb { background: #1877F2; }
+.red-tt { background: #111; }
 </style>
 
 <script>
@@ -6789,6 +6848,43 @@ body #contenedor3D > #btnTerminarRuta {
 
   // Al empezar a caminar, el panel se esconde
   if (empezar) empezar.addEventListener('click', cerrar);
+})();
+</script>
+<script>
+(function () {
+    var avisado = false;
+
+    window.mostrarAlertaFueraCampus = function (metros) {
+        var texto = document.getElementById('fueraDistancia');
+        if (texto) {
+            if (isFinite(metros) && metros > 0) {
+                texto.textContent = 'Estás a aproximadamente ' +
+                    (metros >= 1000 ? (metros / 1000).toFixed(1) + ' km' : Math.round(metros) + ' m') +
+                    ' del campus.';
+            } else {
+                texto.textContent = '';
+            }
+        }
+        document.getElementById('modalFueraCampus').classList.remove('hidden');
+        if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    };
+
+    document.getElementById('btnCerrarFuera').addEventListener('click', function () {
+        document.getElementById('modalFueraCampus').classList.add('hidden');
+    });
+
+    // Revisa tu ubicación cada 3 segundos; avisa una sola vez al detectar que estás lejos
+    setInterval(function () {
+        var portada = document.getElementById('portada');
+        if (portada && !portada.classList.contains('oculto')) return; // espera a que entres a la app
+        if (typeof userLocation === 'undefined' || !userLocation) return;
+        var d = distanciaMinimaASenderos(userLocation.lat, userLocation.lng);
+        if (d > 200) {
+            if (!avisado) { avisado = true; mostrarAlertaFueraCampus(d); }
+        } else {
+            avisado = false;
+        }
+    }, 3000);
 })();
 </script>
 </body>
