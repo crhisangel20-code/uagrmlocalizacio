@@ -1,0 +1,20 @@
+{
+  "name": "Mapa Inteligente UAGRM",
+  "short_name": "Mapa UAGRM",
+  "description": "Orientación y rutas dentro del campus de la UAGRM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A4A35",
+  "theme_color": "#0A4A35",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "esscudo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
