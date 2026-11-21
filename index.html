@@ -2443,13 +2443,28 @@ body.rol-admin main { padding-top: 70px; }
 
             const nodoInicio = nodoMasCercano(redSenderos, origen.lat, origen.lng);
             const nodoFin = nodoMasCercano(redSenderos, destinoWp.lat, destinoWp.lng);
-            const grafo = construirGrafo(redSenderos);
-            const resultado = seleccionarRutaConAccesoAlModulo(
-                grafo,
-                nodoInicio.id,
-                destinoWp,
-                nodoFin
-            );
+                        const grafo = construirGrafo(redSenderos);
+
+            // Si el módulo destino tiene puerta marcada en el editor, la ruta termina ahí
+            const puertaNodo = destinoActual
+                ? redSenderos.nodos.find(function(n) { return n.puerta === destinoActual.id; })
+                : null;
+
+            let resultado = null;
+            if (puertaNodo) {
+                const busquedaPuerta = dijkstraDesdeTodos(grafo, nodoInicio.id);
+                const caminoPuerta = reconstruirCamino(busquedaPuerta.previos, nodoInicio.id, puertaNodo.id);
+                if (caminoPuerta) {
+                    resultado = {
+                        camino: caminoPuerta,
+                        distanciaTotal: busquedaPuerta.distancias[puertaNodo.id],
+                        nodoFinal: puertaNodo
+                    };
+                }
+            }
+            if (!resultado) {
+                resultado = seleccionarRutaConAccesoAlModulo(grafo, nodoInicio.id, destinoWp, nodoFin);
+            }
 
             if (!resultado) {
                 callback.call(context, { status: -1, message: 'No hay un camino conectado entre esos dos puntos en la red de senderos.' });
@@ -2464,7 +2479,7 @@ body.rol-admin main { padding-top: 70px; }
                 coordenadasRuta.push(L.latLng(nodo.lat, nodo.lng));
             });
             const ultimoPuntoRed = coordenadasRuta[coordenadasRuta.length - 1];
-            if (distancia(ultimoPuntoRed.lat, ultimoPuntoRed.lng, destinoWp.lat, destinoWp.lng) > 1) {
+           if (!puertaNodo && distancia(ultimoPuntoRed.lat, ultimoPuntoRed.lng, destinoWp.lat, destinoWp.lng) > 1) {
                 coordenadasRuta.push(L.latLng(destinoWp.lat, destinoWp.lng));
             }
 
@@ -3628,7 +3643,7 @@ if (!esRecalculoAutomatico) {
         }
     };
 
-    if (distanciaDirectaMetros <= 260) {
+    if (distanciaDirectaMetros <= 30) {
         statusMsg.innerHTML = '✅ Estás a ' + Math.round(distanciaDirectaMetros) + ' m del destino. Sigue los círculos.';
         btnIniciarRutaPie.classList.add('hidden');
         panelInstrucciones.classList.add('hidden');
